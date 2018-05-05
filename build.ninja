@@ -1,0 +1,15 @@
+builddir = build
+
+cflags = -g -I src -Werror -Wall -Wextra -std=c99 -pedantic
+
+rule cc
+  depfile = $out.d
+  deps = gcc
+  command = gcc -MMD -MF $out.d -c $cflags $in -o $out
+
+rule ld
+  command = gcc $in -o $out
+
+build $builddir/lexer.o: cc src/lexer.c
+build $builddir/test/lexer.o: cc test/lexer.c
+build $builddir/test/lexer: ld $builddir/test/lexer.o $builddir/lexer.o
