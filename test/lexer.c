@@ -248,6 +248,10 @@ void test_id(void) {
   assert(t.tt == VAL);
   assert(t.len == 3);
 
+  t = tokenize("fn");
+  assert(t.tt == FN);
+  assert(t.len == 2);
+
   t = tokenize("type");
   assert(t.tt == TYPE);
   assert(t.len == 4);

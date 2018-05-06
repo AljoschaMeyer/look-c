@@ -364,6 +364,8 @@ Token tokenize(const char *src) {
             tt = AS;
           } else if (strcmp(src, "val") == 0) {
             tt = VAL;
+          } else if (strcmp(src, "fn") == 0) {
+            tt = FN;
           } else if (strcmp(src, "type") == 0) {
             tt = TYPE;
           } else if (strcmp(src, "macro") == 0) {

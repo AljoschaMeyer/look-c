@@ -1,6 +1,6 @@
 builddir = build
 
-cflags = -g -I src -Werror -Wall -Wextra -std=c99 -pedantic
+cflags = -g -I src -Werror -Wall -Wextra -std=c11 -pedantic
 
 rule cc
   depfile = $out.d
