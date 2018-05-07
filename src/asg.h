@@ -7,24 +7,23 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdlib.h>
 
-#include "rax.h" // TODO remove this
-
-// TODO clean up: forward declarations, sensible order
-// TODO add free functions
+#include "rax.h"
 
 struct AsgMeta;
 
-struct AsgItem;
-struct AsgType;
-struct AsgExp;
-struct AsgRepeat;
-struct AsgLValue;
-struct AsgPatternIrref;
-struct AsgPattern;
+typedef struct AsgItem AsgItem;
+typedef struct AsgMeta AsgMeta;
+typedef struct AsgType AsgType;
+typedef struct AsgExp AsgExp;
+typedef struct AsgRepeat AsgRepeat;
+typedef struct AsgLValue AsgLValue;
+typedef struct AsgPatternIrref AsgPatternIrref;
+typedef struct AsgPattern AsgPattern;
 
 typedef enum {
-  BINDING_NONE, // binding resolution did not happen, or the sid does not resolve to a binding
+  BINDING_NONE, // the sid does not resolve to a binding (because it defines one)
   BINDING_ERROR, // binding resolution failed
   BINDING_ITEM_USE,
   BINDING_ITEM_USE_RENAME,
@@ -41,7 +40,7 @@ typedef enum {
 
 // A simple identifier
 typedef struct AsgSid {
-  char *src;
+  const char *src;
   size_t len;
   BindingType bt;
   void *binding;
@@ -66,7 +65,7 @@ typedef enum {
 } TagLiteral;
 
 typedef struct AsgLiteral {
-  char *src;
+  const char *src;
   size_t len;
   TagLiteral tag;
 } AsgLiteral;
@@ -107,7 +106,7 @@ typedef struct AsgRepeatBinOp {
 } AsgRepeatBinOp;
 
 typedef struct AsgRepeat {
-  char *src;
+  const char *src;
   size_t len;
   TagRepeat tag;
   union {
@@ -121,11 +120,11 @@ typedef struct AsgRepeat {
 
 // Root node of the asg.
 typedef struct AsgFile {
-  char *src;
+  const char *src;
   size_t len;
   AsgItem *items;
   size_t item_len;
-  rax *items_by_id; // stores `AsgItem`s TODO remove this, keep analysis separate? If so, remove header include
+  rax *items_by_id; // stores `AsgItem`s TODO remove this, keep analysis separate?
 } AsgFile;
 
 // TODO functions: parse, typecheck (context?), free (does not free source string)
@@ -137,14 +136,14 @@ typedef enum {
 } TagMeta;
 
 typedef struct AsgMetaNested {
-  char *src;
+  const char *src;
   size_t len;
   AsgMeta *inner;
   size_t inner_len;
 } AsgMetaNested;
 
 typedef struct AsgMeta {
-  char *src;
+  const char *src;
   size_t len;
   TagMeta tag;
   char *name;
@@ -172,14 +171,14 @@ typedef enum {
 } TagUseTree;
 
 typedef struct AsgUseTreeRename {
-  char *src;
+  const char *src;
   size_t len;
   AsgSid sid;
   AsgSid new_sid;
 } AsgUseTreeRename;
 
 typedef struct AsgUseTreeBranch {
-  char *src;
+  const char *src;
   size_t len;
   AsgSid sid;
   AsgSid *children;
@@ -187,7 +186,7 @@ typedef struct AsgUseTreeBranch {
 } AsgUseTreeBranch;
 
 typedef struct AsgUseTree {
-  char *src;
+  const char *src;
   size_t len;
   TagUseTree tag;
   union {
@@ -291,7 +290,7 @@ typedef struct AsgTypeSum {
 } AsgTypeSum;
 
 typedef struct AsgType {
-  char *src;
+  const char *src;
   size_t len;
   TagType tag;
   union {
@@ -461,7 +460,7 @@ typedef struct AsgLValueProductAccessNamed {
 } AsgLValueProductAccessNamed;
 
 typedef struct AsgLValue {
-  char *src;
+  const char *src;
   size_t len;
   TagLValue tag;
   union {
@@ -506,7 +505,7 @@ typedef struct AsgPatternIrrefProductNamed {
 } AsgPatternIrrefProductNamed;
 
 typedef struct AsgPatternIrref {
-  char *src;
+  const char *src;
   size_t len;
   TagPatternIrref tag;
   union {
@@ -577,7 +576,7 @@ typedef struct AsgPatternSummandNamed {
 } AsgPatternSummandNamed;
 
 typedef struct AsgPattern {
-  char *src;
+  const char *src;
   size_t len;
   TagPattern tag;
   union {
@@ -607,7 +606,7 @@ typedef struct AsgExpLoop {
 } AsgExpLoop;
 
 typedef struct AsgExp {
-  char *src;
+  const char *src;
   size_t len;
   ExpTag tag;
   union {
@@ -659,7 +658,6 @@ typedef struct AsgItemFun {
   size_t type_args_len;
   AsgSid *arg_sids;
   AsgType *arg_types; // same length as arg_sids
-  bool *arg_muts; // same length as arg_sids
   size_t arg_sids_len;
   AsgType *ret; // may be null if return type is omitted
   AsgExpBlock *body;
@@ -677,7 +675,7 @@ typedef struct AsgItemFfiVal {
 } AsgItemFfiVal;
 
 typedef struct AsgItem {
-  char *src;
+  const char *src;
   size_t len;
   TagItem tag;
   AsgMeta *attrs;

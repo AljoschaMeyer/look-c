@@ -13,3 +13,8 @@ rule ld
 build $builddir/lexer.o: cc src/lexer.c
 build $builddir/test/lexer.o: cc test/lexer.c
 build $builddir/test/lexer: ld $builddir/test/lexer.o $builddir/lexer.o
+
+build $builddir/parser.o: cc src/parser.c
+build $builddir/test/parser.o: cc test/parser.c
+build $builddir/test/parser: ld $builddir/test/parser.o $builddir/parser.o $builddir/lexer.o
+
