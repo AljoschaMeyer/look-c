@@ -117,26 +117,11 @@ void test_compound(void) {
   assert(t.len == 0);
 }
 
-void test_comment(void) {
-  char *src = "//\n/// abc\n// \n";
+void test_ws(void) {
+  char *src = "  \n  //\n/// abc\n// \n";
   Token t = tokenize(src);
-  assert(t.tt == COMMENT);
-  assert(t.len == 3);
-
-  src += t.len;
-  t = tokenize(src);
-  assert(t.tt == DOC_COMMENT);
-  assert(t.len == 8);
-
-  src += t.len;
-  t = tokenize(src);
-  assert(t.tt == COMMENT);
-  assert(t.len == 4);
-
-  src += t.len;
-  t = tokenize(src);
   assert(t.tt == END);
-  assert(t.len == 0);
+  assert(t.len == 20);
 }
 
 void test_id(void) {
@@ -144,36 +129,25 @@ void test_id(void) {
   Token t = tokenize(src);
   assert(t.tt == UNDERSCORE);
   assert(t.len == 1);
-
-  src += t.len;
-  t = tokenize(src);
-  assert(t.tt == WS);
-  assert(t.len == 1);
-
-  src += t.len;
-  t = tokenize(src);
-  assert(t.tt == ID);
-  assert(t.len == 2);
-
-  src += t.len;
-  t = tokenize(src);
-  assert(t.tt == WS);
-  assert(t.len == 1);
+  assert(t.token_len == 1);
 
   src += t.len;
   t = tokenize(src);
   assert(t.tt == ID);
   assert(t.len == 3);
-
-  src += t.len;
-  t = tokenize(src);
-  assert(t.tt == WS);
-  assert(t.len == 1);
+  assert(t.token_len == 2);
 
   src += t.len;
   t = tokenize(src);
   assert(t.tt == ID);
-  assert(t.len == 1);
+  assert(t.len == 4);
+  assert(t.token_len == 3);
+
+  src += t.len;
+  t = tokenize(src);
+  assert(t.tt == ID);
+  assert(t.len == 2);
+  assert(t.token_len == 1);
 
   src += t.len;
   t = tokenize(src);
@@ -375,6 +349,7 @@ int main(void)
   test_simple();
   test_simple_compound();
   test_compound();
+  test_ws();
   test_id();
   test_number();
   test_string();

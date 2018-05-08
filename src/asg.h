@@ -52,9 +52,9 @@ typedef struct AsgId {
 } AsgId;
 
 typedef struct AsgMacroInv {
-  char *name;
+  const char *name;
   size_t name_len;
-  char *args;
+  const char *args;
   size_t args_len;
 } AsgMacroInv;
 

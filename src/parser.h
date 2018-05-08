@@ -9,7 +9,9 @@
 typedef enum {
   ERR_NONE,
   ERR_SID,
-  ERR_ID
+  ERR_ID,
+  ERR_MACRO_INV,
+  ERR_LITERAL
 } OoTagError;
 
 typedef struct OoError {

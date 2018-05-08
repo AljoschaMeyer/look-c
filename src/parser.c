@@ -65,6 +65,10 @@ size_t parse_id(const char *src, OoError *err, AsgId *data) {
   );
 }
 
+void free_inner_id(AsgId data) {
+  free(data.sids);
+}
+
 size_t parse_sid(const char *src, OoError *err, AsgSid *data) {
   Token t = tokenize(src);
 
@@ -76,13 +80,61 @@ size_t parse_sid(const char *src, OoError *err, AsgSid *data) {
     err->tag = ERR_NONE;
   }
 
-  data->src = src;
-  data->len = t.len;
+  data->src = src + (t.len - t.token_len);
+  data->len = t.token_len;
 
   return t.len;
 }
 
-void free_inner_id(AsgId data) {
-  free(data.sids);
+size_t parse_macro_inv(const char *src, OoError *err, AsgMacroInv *data) {
+  err->tag = ERR_MACRO_INV;
+
+  size_t l = 0;
+  Token t;
+  
+  t = tokenize(src);
+  l += t.len;
+  if (t.tt != DOLLAR) {
+    err->tt = t.tt;
+    return l;
+  }
+
+  AsgSid tmp;
+  l += parse_sid(src + l, err, &tmp);
+  if (err->tag != ERR_NONE) {
+    err->tag = ERR_MACRO_INV;
+    return l;
+  }
+  data->name = tmp.src;
+  data->name_len = tmp.len;
+
+  t = tokenize(src + l);
+  l += t.len;
+  if (t.tt != LPAREN) {
+    err->tt = t.tt;
+    return l;
+  }
+
+  size_t args_start = l;
+  size_t nesting = 1;
+  while (nesting > 0) {
+    t = tokenize(src + l);
+    l += t.len;
+
+    if (token_type_error(t.tt)) {
+      err->tt = t.tt;
+      return l;
+    } else if (t.tt == LPAREN) {
+      nesting += 1;
+    } else if (t.tt == RPAREN) {
+      nesting -= 1;
+    }
+  }
+
+  data->args = src + args_start;
+  data->args_len = l - (args_start + t.len); // last RPAREN is not part of the args
+
+  err->tag = ERR_NONE;
+  return l;
 }
 

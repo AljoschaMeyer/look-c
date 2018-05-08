@@ -32,21 +32,74 @@ void test_id() {
   assert(data.sids[0].src == src);
   free_inner_id(data);
 
-  src = "abc::def::ghi";
+  src = "abc:: def ::ghi";
   l = parse_id(src, &err, &data);
-  assert(l == 13);
+  assert(l == 15);
   assert(err.tag == ERR_NONE);
   assert(data.sids_len == 3);
   assert(data.sids[0].src == src);
-  assert(data.sids[1].src == src + 5);
-  assert(data.sids[2].src == src + 10);
+  assert(data.sids[0].len == 3);
+  assert(data.sids[1].src == src + 6);
+  assert(data.sids[0].len == 3);
+  assert(data.sids[0].len == 3);
+  assert(data.sids[2].src == src + 12);
   free_inner_id(data);
+}
+
+void test_macro_inv() {
+  const char *src = "$abc()";
+  AsgMacroInv data;
+  OoError err;
+  size_t l;
+
+  l = parse_macro_inv(src, &err, &data);
+  assert(l == 6);
+  assert(err.tag == ERR_NONE);
+  assert(data.name_len == 3);
+  assert(data.name == src + 1);
+  assert(data.args_len == 0);
+  assert(data.args == src + 5);
+
+  src = "$abc(())";
+  l = parse_macro_inv(src, &err, &data);
+  assert(l == 8);
+  assert(err.tag == ERR_NONE);
+  assert(data.name_len == 3);
+  assert(data.name == src + 1);
+  assert(data.args_len == 2);
+  assert(data.args == src + 5);
+}
+
+void test_literal() {
+  const char *src = "$abc()"; // TODO signs for number literals?
+  AsgMacroInv data;
+  OoError err;
+  size_t l;
+
+  l = parse_macro_inv(src, &err, &data);
+  assert(l == 6);
+  assert(err.tag == ERR_NONE);
+  assert(data.name_len == 3);
+  assert(data.name == src + 1);
+  assert(data.args_len == 0);
+  assert(data.args == src + 5);
+
+  src = "$abc(())";
+  l = parse_macro_inv(src, &err, &data);
+  assert(l == 8);
+  assert(err.tag == ERR_NONE);
+  assert(data.name_len == 3);
+  assert(data.name == src + 1);
+  assert(data.args_len == 2);
+  assert(data.args == src + 5);
 }
 
 int main(void)
 {
   test_sid();
   test_id();
+  test_macro_inv();
+  test_literal();
 
   return 0;
 }

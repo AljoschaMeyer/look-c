@@ -38,10 +38,7 @@ typedef enum {
   S_PIPE, // | or || or |=
   S_HAT, // ^ or ^=
   S_AMPERSAND, // & or && or &=
-  S_COMMENT_START, // //
   S_COMMENT, // //foo
-  S_DOC_COMMENT, // ///foo
-  S_WS, // only space and \n
   S_UNDERSCORE, // blank pattern or identifier
   S_ID,
   S_INT,
@@ -59,6 +56,7 @@ static bool is_id_char(char c) {
 Token tokenize(const char *src) {
   State s = S_INITIAL;
   size_t len = 0;
+  size_t token_start = 0;
   char c;
   TokenType tt;
   Token ret;
@@ -71,7 +69,7 @@ Token tokenize(const char *src) {
       case S_INITIAL:
         if (c == 0) {
           tt = END;
-          len = 0;
+          len -= 1;
           goto done;
         } else if (c == '@') {
           tt = AT;
@@ -117,11 +115,11 @@ Token tokenize(const char *src) {
           goto done;
         } else if (c == '\t') {
           tt = ERR_TAB;
-          len = 0;
+          len -= 1;
           goto done;
         } else if (c == '\r') {
           tt = ERR_CARRIAGE;
-          len = 0;
+          len -= 1;
           goto done;
         } else if (c == '#') {
           s = S_HASH;
@@ -146,8 +144,7 @@ Token tokenize(const char *src) {
         } else if (c == '^') {
           s = S_HAT;
         } else if (c == ' ' || c == '\n') {
-          s = S_WS;
-          tt = WS;
+          token_start += 1;
         } else if (c == '_') {
           s = S_UNDERSCORE;
         } else if ('0' <= c && c <= '9') {
@@ -171,7 +168,7 @@ Token tokenize(const char *src) {
           goto done;
         } else {
           tt = ERR_BEGIN_ATTRIBUTE;
-          len = 1;
+          len -= 1;
           goto done;
         }
       case S_AMPERSAND:
@@ -183,7 +180,7 @@ Token tokenize(const char *src) {
           goto done;
         } else {
           tt = AMPERSAND;
-          len = 1;
+          len -= 1;
           goto done;
         }
       case S_PIPE:
@@ -195,7 +192,7 @@ Token tokenize(const char *src) {
           goto done;
         } else {
           tt = PIPE;
-          len = 1;
+          len -= 1;
           goto done;
         }
       case S_EQ:
@@ -207,7 +204,7 @@ Token tokenize(const char *src) {
           goto done;
         } else {
           tt = EQ;
-          len = 1;
+          len -= 1;
           goto done;
         }
       case S_COLON:
@@ -216,7 +213,7 @@ Token tokenize(const char *src) {
           goto done;
         } else {
           tt = COLON;
-          len = 1;
+          len -= 1;
           goto done;
         }
       case S_PLUS:
@@ -225,7 +222,7 @@ Token tokenize(const char *src) {
           goto done;
         } else {
           tt = PLUS;
-          len = 1;
+          len -= 1;
           goto done;
         }
       case S_MINUS:
@@ -237,7 +234,7 @@ Token tokenize(const char *src) {
           goto done;
         } else {
           tt = MINUS;
-          len = 1;
+          len -= 1;
           goto done;
         }
       case S_TIMES:
@@ -246,7 +243,7 @@ Token tokenize(const char *src) {
           goto done;
         } else {
           tt = TIMES;
-          len = 1;
+          len -= 1;
           goto done;
         }
       case S_DIV:
@@ -254,12 +251,12 @@ Token tokenize(const char *src) {
           tt = DIV_ASSIGN;
           goto done;
         } if (c == '/') {
-          tt = COMMENT;
-          s = S_COMMENT_START;
+          token_start += 2;
+          s = S_COMMENT;
           break;
         } else {
           tt = DIV;
-          len = 1;
+          len -= 1;
           goto done;
         }
       case S_MOD:
@@ -268,7 +265,7 @@ Token tokenize(const char *src) {
           goto done;
         } else {
           tt = MOD;
-          len = 1;
+          len -= 1;
           goto done;
         }
       case S_HAT:
@@ -277,41 +274,15 @@ Token tokenize(const char *src) {
           goto done;
         } else {
           tt = XOR;
-          len = 1;
-          goto done;
-        }
-      case S_COMMENT_START:
-        if (c == '/') {
-          tt = DOC_COMMENT;
-          s = S_DOC_COMMENT;
-        } else if (c == 0) {
-          tt = ERR_EOF;
-          len -= 1;
-          goto done;
-        } else {
-          s = S_COMMENT;
-        }
-        break;
-      case S_DOC_COMMENT:
-        if (c == '\n') {
-          goto done;
-        } else if (c == 0) {
-          tt = ERR_EOF;
           len -= 1;
           goto done;
         }
-        break;
       case S_COMMENT:
+        token_start += 1;
         if (c == '\n') {
-          goto done;
+          s = S_INITIAL;
         } else if (c == 0) {
           tt = ERR_EOF;
-          len -= 1;
-          goto done;
-        }
-        break;
-      case S_WS:
-        if (!(c == ' ' || c == '\n')) {
           len -= 1;
           goto done;
         }
@@ -604,6 +575,7 @@ Token tokenize(const char *src) {
   done:
   ret.tt = tt;
   ret.len = len;
+  ret.token_len = len - token_start;
   return ret;
 }
 
