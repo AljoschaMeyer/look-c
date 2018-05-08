@@ -110,7 +110,7 @@ typedef struct AsgRepeat {
   size_t len;
   TagRepeat tag;
   union {
-    char *integer;
+    char integer; // ignored, the int is in src
     AsgMacroInv macro;
     AsgType *size_of;
     AsgType *align_of;

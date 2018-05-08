@@ -11,7 +11,10 @@ typedef enum {
   ERR_SID,
   ERR_ID,
   ERR_MACRO_INV,
-  ERR_LITERAL
+  ERR_LITERAL,
+  ERR_REPEAT,
+  ERR_BIN_OP,
+  ERR_TYPE
 } OoTagError;
 
 typedef struct OoError {
@@ -98,13 +101,12 @@ size_t parse_id(const char *src, OoError *err, AsgId *data);
 size_t parse_sid(const char *src, OoError *err, AsgSid *data);
 size_t parse_macro_inv(const char *src, OoError *err, AsgMacroInv *data);
 size_t parse_literal(const char *src, OoError *err, AsgLiteral *data);
-
 size_t parse_repeat(const char *src, OoError *err, AsgRepeat *data);
-size_t parse_repeat_bin_op(const char *src, OoError *err, AsgRepeatBinOp *data);
 
 // The free_inner_foo functions free the child nodes of their argument (but
 // not the argument itself).
 
 void free_inner_id(AsgId data);
+void free_inner_repeat(AsgRepeat data);
 
 #endif

@@ -100,12 +100,30 @@ void test_literal() {
   assert(data.tag == LITERAL_STRING);
 }
 
+void test_repeat(void) {
+  char *src = "42 + $foo()";
+  OoError err;
+  AsgRepeat data;
+
+  assert(parse_repeat(src, &err, &data) == 11);
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == REPEAT_BIN_OP);
+  assert(data.bin_op.lhs->tag == REPEAT_INT);
+  assert(data.bin_op.lhs->len == 2);
+  assert(data.bin_op.rhs->tag == REPEAT_MACRO);
+  assert(data.bin_op.rhs->macro.name == src + 6);
+  assert(data.bin_op.rhs->macro.name_len == 3);
+
+  free_inner_repeat(data);
+}
+
 int main(void)
 {
   test_sid();
   test_id();
   test_macro_inv();
   test_literal();
+  test_repeat();
 
   return 0;
 }
