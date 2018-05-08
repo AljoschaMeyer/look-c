@@ -339,6 +339,7 @@ typedef enum {
   EXP_SIZE_OF,
   EXP_ALIGN_OF,
   EXP_NOT,
+  EXP_NEGATE,
   EXP_BIN_OP,
   EXP_ASSIGN,
   EXP_VAL,
@@ -632,6 +633,7 @@ typedef struct AsgExp {
     AsgType *size_of;
     AsgType *align_of;
     AsgExp *exp_not;
+    AsgExp *exp_negate;
     AsgExpBinOp bin_op;
     AsgExpAssign assign;
     AsgExpVal val;

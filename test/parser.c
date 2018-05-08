@@ -71,27 +71,33 @@ void test_macro_inv() {
 }
 
 void test_literal() {
-  const char *src = "$abc()"; // TODO signs for number literals?
-  AsgMacroInv data;
+  const char *src = "42";
+  AsgLiteral data;
   OoError err;
   size_t l;
 
-  l = parse_macro_inv(src, &err, &data);
-  assert(l == 6);
+  l = parse_literal(src, &err, &data);
+  assert(l == 2);
   assert(err.tag == ERR_NONE);
-  assert(data.name_len == 3);
-  assert(data.name == src + 1);
-  assert(data.args_len == 0);
-  assert(data.args == src + 5);
+  assert(data.src == src);
+  assert(data.len == 2);
+  assert(data.tag == LITERAL_INT);
 
-  src = "$abc(())";
-  l = parse_macro_inv(src, &err, &data);
-  assert(l == 8);
+  src = "0.0";
+  l = parse_literal(src, &err, &data);
+  assert(l == 3);
   assert(err.tag == ERR_NONE);
-  assert(data.name_len == 3);
-  assert(data.name == src + 1);
-  assert(data.args_len == 2);
-  assert(data.args == src + 5);
+  assert(data.src == src);
+  assert(data.len == 3);
+  assert(data.tag == LITERAL_FLOAT);
+
+  src = "\"abc\"";
+  l = parse_literal(src, &err, &data);
+  assert(l == 5);
+  assert(err.tag == ERR_NONE);
+  assert(data.src == src);
+  assert(data.len == 5);
+  assert(data.tag == LITERAL_STRING);
 }
 
 int main(void)

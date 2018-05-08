@@ -5,6 +5,13 @@
 #include "parser.h"
 #include "asg.h"
 
+// Consumes a token, but with the generic parsing function signature.
+size_t parse_token(const char *src, OoError *err, void *data) {
+  (void)err;
+  *((Token *) data) = tokenize(src);
+  return ((Token *) data)->len; 
+}
+
 size_t sep_1(const char *src, OoError *err,
   size_t parse (const char *, OoError *, void *),
   size_t data_size, TokenType tt,
@@ -138,3 +145,21 @@ size_t parse_macro_inv(const char *src, OoError *err, AsgMacroInv *data) {
   return l;
 }
 
+size_t parse_literal(const char *src, OoError *err, AsgLiteral *data) {
+  Token t = tokenize(src);
+  err->tag = ERR_NONE;
+  data->src = src + (t.len - t.token_len);
+  data->len = t.token_len;
+
+  if (t.tt == INT) {
+    data->tag = LITERAL_INT;
+  } else if (t.tt == FLOAT) {
+    data->tag = LITERAL_FLOAT;
+  } else if (t.tt == STRING) {
+    data->tag = LITERAL_STRING;
+  } else {
+    err->tag = ERR_LITERAL;
+  }
+
+  return t.len;
+}

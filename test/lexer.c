@@ -259,6 +259,18 @@ void test_number(void) {
   Token t = tokenize("001");
   assert(t.tt == INT);
   assert(t.len == 3);
+
+  t = tokenize("0.0");
+  assert(t.tt == FLOAT);
+  assert(t.len == 3);
+
+  t = tokenize("0.0e0");
+  assert(t.tt == FLOAT);
+  assert(t.len == 5);
+
+  t = tokenize("0.0e-0");
+  assert(t.tt == FLOAT);
+  assert(t.len == 6);
 }
 
 void test_string(void) {

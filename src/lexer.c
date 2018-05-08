@@ -20,6 +20,10 @@ const char * token_type_error(TokenType tt) {
     return "Hexadecimal escapes must use upper case letters (ABCDEF), not lower case";
   } else if (tt == ERR_NON_HEX) {
     return "Expected hexadecimal character (0123456789ABCDEF)";
+  } else if (tt == ERR_FLOAT_NO_DECIMALS) {
+    return "Floating point literals must have at least one decimal";
+  } else if (tt == ERR_FLOAT_NO_EXPONENT) {
+    return "Expected an exponent for the floating point literal";
   } else {
     return NULL;
   }
@@ -42,6 +46,11 @@ typedef enum {
   S_UNDERSCORE, // blank pattern or identifier
   S_ID,
   S_INT,
+  S_INT_DOT,
+  S_FLOAT,
+  S_FLOAT_E,
+  S_FLOAT_E_MINUS,
+  S_FLOAT_EXPONENT,
   S_STRING,
   S_STRING_BACKSLASH,
   S_STRING_u_0, S_STRING_u_1, S_STRING_u_2, S_STRING_u_3,
@@ -357,6 +366,52 @@ Token tokenize(const char *src) {
         }
         break;
       case S_INT:
+        if (c == '.') {
+          s = S_INT_DOT;
+        } else if (!('0' <= c && c <= '9')) {
+          len -= 1;
+          goto done;
+        }
+        break;
+      case S_INT_DOT:
+        if (!('0' <= c && c <= '9')) {
+          len -= 1;
+          tt = ERR_FLOAT_NO_DECIMALS;
+          goto done;
+        } else {
+          tt = FLOAT;
+          s = S_FLOAT;
+        }
+        break;
+      case S_FLOAT:
+        if (c == 'e') {
+          s = S_FLOAT_E;
+        } else if (!('0' <= c && c <= '9')) {
+          len -= 1;
+          goto done;
+        }
+        break;
+      case S_FLOAT_E:
+        if (c == '-') {
+          s = S_FLOAT_E_MINUS;
+        } else if ('0' <= c && c <= '9') {
+          s = S_FLOAT_EXPONENT;
+        } else {
+          len -= 1;
+          tt = ERR_FLOAT_NO_EXPONENT;
+          goto done;
+        }
+        break;
+      case S_FLOAT_E_MINUS:
+        if ('0' <= c && c <= '9') {
+          s = S_FLOAT_EXPONENT;
+        } else {
+          len -= 1;
+          tt = ERR_FLOAT_NO_EXPONENT;
+          goto done;
+        }
+        break;
+      case S_FLOAT_EXPONENT:
         if (!('0' <= c && c <= '9')) {
           len -= 1;
           goto done;
