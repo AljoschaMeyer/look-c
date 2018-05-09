@@ -41,7 +41,6 @@ size_t parse_use_tree_branch(const char *src, OoError *err, AsgUseTreeBranch *da
 size_t parse_item_type(const char *src, OoError *err, AsgItemType *data);
 size_t parse_type(const char *src, OoError *err, AsgType *data);
 size_t parse_type_product_repeated(const char *src, OoError *err, AsgTypeProductRepeated *data);
-size_t parse_type_product_anon(const char *src, OoError *err, AsgTypeProductAnon *data);
 size_t parse_type_product_named(const char *src, OoError *err, AsgTypeProductNamed *data);
 size_t parse_type_fun_anon(const char *src, OoError *err, AsgTypeFunAnon *data);
 size_t parse_type_fun_named(const char *src, OoError *err, AsgTypeFunNamed *data);
@@ -108,5 +107,6 @@ size_t parse_repeat(const char *src, OoError *err, AsgRepeat *data);
 
 void free_inner_id(AsgId data);
 void free_inner_repeat(AsgRepeat data);
+void free_inner_type(AsgType data);
 
 #endif

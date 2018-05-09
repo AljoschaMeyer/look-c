@@ -47,11 +47,14 @@ typedef struct AsgSid {
 } AsgSid;
 
 typedef struct AsgId {
+  const char *src;
+  size_t len;
   AsgSid *sids;
-  size_t sids_len;
 } AsgId;
 
 typedef struct AsgMacroInv {
+  const char *src;
+  size_t len;
   const char *name;
   size_t name_len;
   const char *args;
@@ -110,7 +113,7 @@ typedef struct AsgRepeat {
   size_t len;
   TagRepeat tag;
   union {
-    char integer; // ignored, the int is in src
+    char integer; // always an integer literal
     AsgMacroInv macro;
     AsgType *size_of;
     AsgType *align_of;
@@ -218,27 +221,19 @@ typedef struct AsgTypeProductRepeated {
   AsgRepeat repeat;
 } AsgTypeProductRepeated;
 
-typedef struct AsgTypeProductAnon {
-  AsgType *inners;
-  size_t inners_len;
-} AsgTypeProductAnon;
-
 typedef struct AsgTypeProductNamed {
-  AsgType *inners;
-  AsgSid *names; // same length as inners
-  size_t inners_len;
+  AsgType *types; // stretchy buffer
+  AsgSid *sids; // stretchy buffer, same length as inners
 } AsgTypeProductNamed;
 
 typedef struct AsgTypeFunAnon {
-  AsgType *args;
-  size_t args_len;
+  AsgType *args; // stretchy buffer
   AsgType *ret;
 } AsgTypeFunAnon;
 
 typedef struct AsgTypeFunNamed {
-  AsgType *args;
-  AsgSid *names; // same length as args
-  size_t args_len;
+  AsgType *arg_types; // stretchy buffer
+  AsgSid *arg_sids; // stretchy buffer, same length as args
   AsgType *ret;
 } AsgTypeFunNamed;
 
@@ -300,7 +295,7 @@ typedef struct AsgType {
     AsgType *ptr_mut;
     AsgType *array;
     AsgTypeProductRepeated product_repeated;
-    AsgTypeProductAnon product_anon;
+    AsgType *product_anon; // stretchy_buffer
     AsgTypeProductNamed product_named;
     AsgTypeFunAnon fun_anon;
     AsgTypeFunNamed fun_named;
