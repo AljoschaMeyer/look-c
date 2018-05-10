@@ -12,7 +12,7 @@
 size_t parse_token(const char *src, OoError *err, void *data) {
   (void)err;
   *((Token *) data) = tokenize(src);
-  return ((Token *) data)->len; 
+  return ((Token *) data)->len;
 }
 
 size_t parse_id(const char *src, OoError *err, AsgId *data) {
@@ -22,7 +22,7 @@ size_t parse_id(const char *src, OoError *err, AsgId *data) {
   err->tag = ERR_NONE;
   data->sids = NULL;
   sb_add(data->sids, 1);
-  
+
   l += parse_sid(src, err, &sb_last(data->sids));
   if (err->tag != ERR_NONE) {
     sb_free(data->sids);
@@ -74,7 +74,7 @@ size_t parse_macro_inv(const char *src, OoError *err, AsgMacroInv *data) {
 
   size_t l = 0;
   Token t;
-  
+
   t = tokenize(src);
   l += t.len;
   if (t.tt != DOLLAR) {
@@ -295,7 +295,7 @@ size_t parse_align_of(const char *src, OoError *err, AsgType *data) {
 size_t parse_repeat(const char *src, OoError *err, AsgRepeat *data) {
   Token t = tokenize(src);
   err->tag = ERR_NONE;
-  data->src = src + (t.len - t.token_len); 
+  data->src = src + (t.len - t.token_len);
   size_t l = 0;
 
   if (t.tt == INT) {
@@ -337,16 +337,16 @@ size_t parse_repeat(const char *src, OoError *err, AsgRepeat *data) {
     err->tag = ERR_NONE;
     return l;
   }
-  
+
   if (data->bin_op.op == OP_LAND || data->bin_op.op == OP_LOR ||
       data->bin_op.op == OP_EQ || data->bin_op.op == OP_NEQ ||
       data->bin_op.op == OP_GT || data->bin_op.op == OP_GET ||
       data->bin_op.op == OP_LT || data->bin_op.op == OP_GET) {
     return l;
   }
-  
+
   l += bin_len;
-  
+
   AsgRepeat *lhs = malloc(sizeof(AsgRepeat));
   memcpy(lhs, data, sizeof(AsgRepeat));
   AsgRepeat *rhs = malloc(sizeof(AsgRepeat));
@@ -374,10 +374,19 @@ void free_inner_repeat(AsgRepeat data) {
   }
 }
 
+void free_sb_types(AsgType *sb) {
+  int i;
+  int count = sb_count(sb);
+  for (i = 0; i < count; i++) {
+    free_inner_type(sb[i]);
+  }
+  sb_free(sb);
+}
+
 size_t parse_type(const char *src, OoError *err, AsgType *data) {
   Token t = tokenize(src);
   err->tag = ERR_NONE;
-  data->src = src + (t.len - t.token_len); 
+  data->src = src + (t.len - t.token_len);
   size_t l = 0;
 
   switch (t.tt) {
@@ -422,7 +431,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
     case LBRACKET:
       l += t.len;
       AsgType *inner_array = malloc(sizeof(AsgType));
-      
+
       l += parse_type(src + l, err, inner_array);
       if (err->tag != ERR_NONE) {
         free(inner_array);
@@ -488,7 +497,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
           l += parse_type(src + l, err, type);
           if (err->tag != ERR_NONE) {
             sb_free(sids);
-            sb_free(types);
+            free_sb_types(types);
             return l;
           }
           t = tokenize(src + l);
@@ -499,7 +508,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
             l += parse_sid(src + l, err, sid);
             if (err->tag != ERR_NONE) {
               sb_free(sids);
-              sb_free(types); // FIXME call free_inner_type on inners. Fix this in a bunch of places...
+              free_sb_types(types);
               err->tag = ERR_TYPE;
               return l;
             }
@@ -508,17 +517,17 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
             l += t.len;
             if (t.tt != EQ) {
               sb_free(sids);
-              sb_free(types);
+              free_sb_types(types);
               err->tag = ERR_TYPE;
               err->tt = t.tt;
               return l;
             }
-          
+
             type = sb_add(types, 1);
             l += parse_type(src + l, err, type);
             if (err->tag != ERR_NONE) {
               sb_free(sids);
-              sb_free(types);
+              free_sb_types(types);
               return l;
             }
 
@@ -536,7 +545,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
             if (err->tag != ERR_NONE) {
               err->tag = ERR_TYPE;
               sb_free(sids);
-              sb_free(types);
+              free_sb_types(types);
               return l;
             }
             data->tag = TYPE_FUN_NAMED;
@@ -560,7 +569,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
       l += parse_type(src + l, err, inner);
       if (err->tag != ERR_NONE) {
         err->tag = ERR_TYPE;
-        sb_free(inners);
+        free_sb_types(inners);
         return l;
       }
 
@@ -569,7 +578,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
       if (t.tt == SEMI) {
         l += parse_repeat(src + l, err, &data->product_repeated.repeat);
         if (err->tag != ERR_NONE) {
-          sb_free(inners);
+          free_sb_types(inners);
           err->tag = ERR_TYPE;
           return l;
         }
@@ -577,7 +586,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
         t = tokenize(src + l);
         l += t.len;
         if (t.tt != RPAREN) {
-          sb_free(inners);
+          free_sb_types(inners);
           err->tag = ERR_TYPE;
           err->tt = t.tt;
           return l;
@@ -593,7 +602,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
       } else if (t.tt != COMMA && t.tt != RPAREN) {
         err->tag = ERR_TYPE;
         err->tt = t.tt;
-        sb_free(inners);
+        free_sb_types(inners);
         return l;
       } else {
         // anon fun, anon product
@@ -601,7 +610,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
           inner = sb_add(inners, 1);
           l += parse_type(src + l, err, inner);
           if (err->tag != ERR_NONE) {
-            sb_free(inners);
+            free_sb_types(inners);
             return l;
           }
 
@@ -609,7 +618,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
           l += t.len;
         }
         if (t.tt != RPAREN) {
-          sb_free(inners);
+          free_sb_types(inners);
           err->tag = ERR_TYPE;
           err->tt = t.tt;
           return l;
@@ -624,7 +633,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
           l += parse_type(src + l, err, ret);
           if (err->tag != ERR_NONE) {
             err->tag = ERR_TYPE;
-            sb_free(inners);
+            free_sb_types(inners);
             return l;
           }
           data->tag = TYPE_FUN_ANON;
@@ -639,9 +648,6 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
           return l;
         }
       }
-
-      // TODO is this unreachable?
-      return l;
     default:
       err->tag = ERR_TYPE;
       err->tt = t.tt;
@@ -651,7 +657,6 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
 }
 
 void free_inner_type(AsgType data) {
-  int i;
   switch (data.tag) {
     case TYPE_ID:
       free_inner_id(data.id);
@@ -672,33 +677,21 @@ void free_inner_type(AsgType data) {
       free_inner_type(*data.product_repeated.inner);
       free(data.product_repeated.inner);
       free_inner_repeat(data.product_repeated.repeat);
-      break;
+    break;
     case TYPE_PRODUCT_ANON:
-      for (i = 0; i < sb_count(data.product_anon); i++) {
-        free_inner_type(data.product_anon[i]);
-      }
-      sb_free(data.product_anon);
+      free_sb_types(data.product_anon);
       break;
     case TYPE_PRODUCT_NAMED:
-      for (i = 0; i < sb_count(data.product_named.types); i++) {
-        free_inner_type(data.product_named.types[i]);
-      }
-      sb_free(data.product_named.types);
+      free_sb_types(data.product_named.types);
       sb_free(data.product_named.sids);
       break;
     case TYPE_FUN_ANON:
-      for (i = 0; i < sb_count(data.fun_anon.args); i++) {
-        free_inner_type(data.fun_anon.args[i]);
-      }
-      sb_free(data.fun_anon.args);
+      free_sb_types(data.fun_anon.args);
       free_inner_type(*data.fun_anon.ret);
       free(data.fun_anon.ret);
       break;
     case TYPE_FUN_NAMED:
-      for (i = 0; i < sb_count(data.fun_named.arg_types); i++) {
-        free_inner_type(data.fun_named.arg_types[i]);
-      }
-      sb_free(data.fun_named.arg_types);
+      free_sb_types(data.fun_named.arg_types);
       sb_free(data.fun_named.arg_sids);
       free_inner_type(*data.fun_named.ret);
       free(data.fun_named.ret);
@@ -707,4 +700,3 @@ void free_inner_type(AsgType data) {
       return;
   }
 }
-
