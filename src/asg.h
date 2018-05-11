@@ -214,7 +214,7 @@ typedef enum {
   TYPE_APP_NAMED,
   TYPE_GENERIC,
   TYPE_SUM
-} TagType; 
+} TagType;
 
 typedef struct AsgTypeProductRepeated {
   AsgType *inner;
@@ -239,14 +239,13 @@ typedef struct AsgTypeFunNamed {
 
 typedef struct AsgTypeAppAnon {
   AsgId tlf; // The type-level function that is applied
-  AsgType *args;
-  size_t args_len;
+  AsgType *args; // stretchy buffer
 } AsgTypeAppAnon;
 
 typedef struct AsgTypeAppNamed {
   AsgId tlf;
-  AsgType *args;
-  AsgSid *names; // same length as args
+  AsgType *types;
+  AsgSid *sids; // same length as args
   size_t args_len;
 } AsgTypeAppNamed;
 
@@ -689,4 +688,3 @@ typedef struct AsgItem {
 } AsgItem;
 
 #endif
-

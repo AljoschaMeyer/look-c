@@ -389,15 +389,140 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
   data->src = src + (t.len - t.token_len);
   size_t l = 0;
 
+  AsgId id;
   switch (t.tt) {
     case ID:
-      l += parse_id(src, err, &data->id);
+      l += parse_id(src, err, &id);
       if (err->tag != ERR_NONE) {
         err->tag = ERR_TYPE;
       }
-      data->tag = TYPE_ID;
-      data->len = data->id.len;
-      return l;
+
+      t = tokenize(src + l);
+      if (t.tt == LANGLE) {
+        // type application
+        l += t.len;
+        t = tokenize(src + l);
+
+        if (t.tt == ID) {
+          // named app iff the next token is EQUALS
+          Token t2 = tokenize(src + l + t.len);
+          if (t2.tt == EQ) {
+            // named app
+            AsgSid *sids = NULL;
+            AsgType *types = NULL;
+
+            AsgSid *sid = sb_add(sids, 1);
+            l += parse_sid(src + l, err, sid);
+            l += t2.len;
+            AsgType *type;
+            type = sb_add(types, 1);
+            l += parse_type(src + l, err, type);
+            if (err->tag != ERR_NONE) {
+              sb_free(sids);
+              free_sb_types(types);
+              return l;
+            }
+            t = tokenize(src + l);
+            l += t.len;
+
+            while (t.tt == COMMA) {
+              sid = sb_add(sids, 1);
+              l += parse_sid(src + l, err, sid);
+              if (err->tag != ERR_NONE) {
+                sb_free(sids);
+                free_sb_types(types);
+                err->tag = ERR_TYPE;
+                return l;
+              }
+
+              t = tokenize(src + l);
+              l += t.len;
+              if (t.tt != EQ) {
+                sb_free(sids);
+                free_sb_types(types);
+                err->tag = ERR_TYPE;
+                err->tt = t.tt;
+                return l;
+              }
+
+              type = sb_add(types, 1);
+              l += parse_type(src + l, err, type);
+              if (err->tag != ERR_NONE) {
+                sb_free(sids);
+                free_sb_types(types);
+                return l;
+              }
+
+              t = tokenize(src + l);
+              l += t.len;
+            }
+
+            if (t.tt == RANGLE) {
+              data->tag = TYPE_APP_NAMED;
+              data->len = l;
+              data->app_named.tlf = id;
+              data->app_named.types = types;
+              data->app_named.sids = sids;
+              return l;
+            } else {
+              err->tag = ERR_TYPE;
+              err->tt = t.tt;
+              sb_free(sids);
+              free_sb_types(types);
+              return l;
+            }
+          }
+        }
+
+        AsgType *inners = NULL;
+        AsgType *inner = sb_add(inners, 1);
+        l += parse_type(src + l, err, inner);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_TYPE;
+          free_sb_types(inners);
+          return l;
+        }
+
+        t = tokenize(src + l);
+        l += t.len;
+        if (t.tt != COMMA && t.tt != RANGLE) {
+          err->tag = ERR_TYPE;
+          err->tt = t.tt;
+          free_sb_types(inners);
+          return l;
+        } else {
+          // anon app
+          while (t.tt == COMMA) {
+            inner = sb_add(inners, 1);
+            l += parse_type(src + l, err, inner);
+            if (err->tag != ERR_NONE) {
+              free_sb_types(inners);
+              return l;
+            }
+
+            t = tokenize(src + l);
+            l += t.len;
+          }
+          if (t.tt != RANGLE) {
+            free_sb_types(inners);
+            err->tag = ERR_TYPE;
+            err->tt = t.tt;
+            return l;
+          }
+
+          data->tag = TYPE_APP_ANON;
+          data->len = l;
+          data->app_anon.tlf = id;
+          data->app_anon.args = inners;
+          return l;
+        }
+      } else {
+        // not a type application, just an id
+        data->tag = TYPE_ID;
+        data->id = id;
+        data->len = data->id.len;
+        return l;
+      }
     case DOLLAR:
       l += parse_macro_inv(src, err, &data->macro);
       if (err->tag != ERR_NONE) {
@@ -554,13 +679,12 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
             data->fun_named.arg_sids = sids;
             data->fun_named.ret = ret;
             return l;
-          } else {
-            data->tag = TYPE_PRODUCT_NAMED;
-            data->len = l;
-            data->product_named.types = types;
-            data->product_named.sids = sids;
-            return l;
           }
+          data->tag = TYPE_PRODUCT_NAMED;
+          data->len = l;
+          data->product_named.types = types;
+          data->product_named.sids = sids;
+          return l;
         }
       }
       // repeated product, anon fun, anon product
@@ -696,6 +820,14 @@ void free_inner_type(AsgType data) {
       free_inner_type(*data.fun_named.ret);
       free(data.fun_named.ret);
       break;
+    case TYPE_APP_ANON:
+      free_inner_id(data.app_anon.tlf);
+      free_sb_types(data.app_anon.args);
+      break;
+    case TYPE_APP_NAMED:
+      free_inner_id(data.app_named.tlf);
+      free_sb_types(data.app_named.types);
+      sb_free(data.app_named.sids);
     default:
       return;
   }
