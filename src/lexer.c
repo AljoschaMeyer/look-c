@@ -310,55 +310,55 @@ Token tokenize(const char *src) {
         if (!is_id_char(c)) {
           len -= 1;
 
-          if (strcmp(src, "use") == 0) {
+          if (strncmp(src + token_start, "use", 3) == 0) {
             tt = USE;
-          } else if (strcmp(src, "mod") == 0) {
+          } else if (strncmp(src + token_start, "mod", 3) == 0) {
             tt = KW_MOD;
-          } else if (strcmp(src, "super") == 0) {
+          } else if (strncmp(src + token_start, "super", 5) == 0) {
             tt = SUPER;
-          } else if (strcmp(src, "self") == 0) {
+          } else if (strncmp(src + token_start, "self", 4) == 0) {
             tt = SELF;
-          } else if (strcmp(src, "dep") == 0) {
+          } else if (strncmp(src + token_start, "dep", 3) == 0) {
             tt = DEP;
-          } else if (strcmp(src, "magic") == 0) {
+          } else if (strncmp(src + token_start, "magic", 5) == 0) {
             tt = MAGIC;
-          } else if (strcmp(src, "goto") == 0) {
+          } else if (strncmp(src + token_start, "goto", 4) == 0) {
             tt = GOTO;
-          } else if (strcmp(src, "label") == 0) {
+          } else if (strncmp(src + token_start, "label", 5) == 0) {
             tt = LABEL;
-          } else if (strcmp(src, "break") == 0) {
+          } else if (strncmp(src + token_start, "break", 5) == 0) {
             tt = BREAK;
-          } else if (strcmp(src, "return") == 0) {
+          } else if (strncmp(src + token_start, "return", 6) == 0) {
             tt = RETURN;
-          } else if (strcmp(src, "if") == 0) {
+          } else if (strncmp(src + token_start, "if", 2) == 0) {
             tt = IF;
-          } else if (strcmp(src, "else") == 0) {
+          } else if (strncmp(src + token_start, "else", 4) == 0) {
             tt = ELSE;
-          } else if (strcmp(src, "while") == 0) {
+          } else if (strncmp(src + token_start, "while", 5) == 0) {
             tt = WHILE;
-          } else if (strcmp(src, "loop") == 0) {
+          } else if (strncmp(src + token_start, "loop", 4) == 0) {
             tt = LOOP;
-          } else if (strcmp(src, "case") == 0) {
+          } else if (strncmp(src + token_start, "case", 4) == 0) {
             tt = CASE;
-          } else if (strcmp(src, "as") == 0) {
+          } else if (strncmp(src + token_start, "as", 2) == 0) {
             tt = AS;
-          } else if (strcmp(src, "val") == 0) {
+          } else if (strncmp(src + token_start, "val", 3) == 0) {
             tt = VAL;
-          } else if (strcmp(src, "fn") == 0) {
+          } else if (strncmp(src + token_start, "fn", 2) == 0) {
             tt = FN;
-          } else if (strcmp(src, "type") == 0) {
+          } else if (strncmp(src + token_start, "type", 4) == 0) {
             tt = TYPE;
-          } else if (strcmp(src, "macro") == 0) {
+          } else if (strncmp(src + token_start, "macro", 5) == 0) {
             tt = MACRO;
-          } else if (strcmp(src, "mut") == 0) {
+          } else if (strncmp(src + token_start, "mut", 3) == 0) {
             tt = MUT;
-          } else if (strcmp(src, "pub") == 0) {
+          } else if (strncmp(src + token_start, "pub", 3) == 0) {
             tt = PUB;
-          } else if (strcmp(src, "ffi") == 0) {
+          } else if (strncmp(src + token_start, "ffi", 3) == 0) {
             tt = FFI;
-          } else if (strcmp(src, "sizeof") == 0) {
+          } else if (strncmp(src + token_start, "sizeof", 6) == 0) {
             tt = SIZEOF;
-          } else if (strcmp(src, "alignof") == 0) {
+          } else if (strncmp(src + token_start, "alignof", 7) == 0) {
             tt = ALIGNOF;
           }
 
@@ -633,4 +633,3 @@ Token tokenize(const char *src) {
   ret.token_len = len - token_start;
   return ret;
 }
-

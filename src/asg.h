@@ -250,37 +250,31 @@ typedef struct AsgTypeAppNamed {
 } AsgTypeAppNamed;
 
 typedef struct AsgTypeGeneric {
-  AsgSid *args;
-  size_t args_len;
+  AsgSid *args; // stretchy buffer
   AsgType *inner;
 } AsgTypeGeneric;
 
 typedef enum { SUMMAND_ANON, SUMMAND_NAMED } TagSummand;
 
-typedef struct AsgSummandAnon {
-  AsgType *inners;
-  size_t inners_len;
-} AsgSummandAnon;
-
 typedef struct AsgSummandNamed {
-  AsgType *inners;
-  AsgSid *names; // same length as inners
-  size_t inners_len;
+  AsgType *inners; // stretchy buffer
+  AsgSid *sids; // stretchy buffer, same length as inners
 } AsgSummandNamed;
 
 typedef struct AsgSummand {
+  const char *src;
+  size_t len;
   TagSummand tag;
   AsgSid sid;
   union {
-    AsgSummandAnon anon;
+    AsgType *anon; // stretchy buffer
     AsgSummandNamed named;
   };
 } AsgSummand;
 
 typedef struct AsgTypeSum {
   bool pub; // Whether the tags are visible (opaque type if false)
-  AsgSummand *summands;
-  size_t summands_len;
+  AsgSummand *summands; // stretchy buffer
 } AsgTypeSum;
 
 typedef struct AsgType {

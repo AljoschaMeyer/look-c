@@ -242,9 +242,13 @@ void test_id(void) {
   assert(t.tt == FFI);
   assert(t.len == 3);
 
-  t = tokenize("pub");
+  t = tokenize("pub ");
   assert(t.tt == PUB);
   assert(t.len == 3);
+
+  t = tokenize(" pub ");
+  assert(t.tt == PUB);
+  assert(t.len == 4);
 
   t = tokenize("sizeof");
   assert(t.tt == SIZEOF);
@@ -331,7 +335,7 @@ void test_error(void) {
   Token t05 = tokenize("\t");
   assert(t05.tt == ERR_TAB);
   assert(t05.len == 0);
-  
+
   Token t06 = tokenize("\r");
   assert(t06.tt == ERR_CARRIAGE);
   assert(t06.len == 0);
@@ -351,7 +355,7 @@ void test_error(void) {
   Token t10 = tokenize("\"\\t\"");
   assert(t10.tt == ERR_INVALID_ESCAPE);
   assert(t10.len == 3);
-  
+
   // TODO eof in u or U escape, invalid u or U escapes
 }
 
@@ -369,4 +373,3 @@ int main(void)
 
   return 0;
 }
-

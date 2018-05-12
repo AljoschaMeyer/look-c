@@ -344,6 +344,68 @@ void test_type(void) {
   assert(data.app_named.sids[1].src == src + 9);
   assert(data.app_named.sids[1].len == 1);
   free_inner_type(data);
+
+  src = "<A> => @A";
+  assert(parse_type(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == TYPE_GENERIC);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.generic.args) == 1);
+  assert(data.generic.args[0].src == src + 1);
+  assert(data.generic.inner->tag == TYPE_PTR);
+  assert(data.generic.inner->len == 3);
+  free_inner_type(data);
+
+  src = "<A, B> => @A";
+  assert(parse_type(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == TYPE_GENERIC);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.generic.args) == 2);
+  assert(data.generic.args[0].src == src + 1);
+  assert(data.generic.args[1].src == src + 4);
+  assert(data.generic.inner->tag == TYPE_PTR);
+  assert(data.generic.inner->len == 3);
+  free_inner_type(data);
+
+  src = "| A";
+  assert(parse_type(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == TYPE_SUM);
+  assert(data.len == strlen(src));
+  assert(!data.sum.pub);
+  assert(sb_count(data.sum.summands) == 1);
+  assert(data.sum.summands[0].tag == SUMMAND_ANON);
+  assert(data.sum.summands[0].sid.src == src + 2);
+  assert(data.sum.summands[0].sid.len == 1);
+  assert(sb_count(data.sum.summands[0].anon) == 0);
+  free_inner_type(data);
+
+  src = "pub | A(@A) | B(b: @Z)";
+  assert(parse_type(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == TYPE_SUM);
+  assert(data.len == strlen(src));
+  assert(data.sum.pub);
+  assert(sb_count(data.sum.summands) == 2);
+  assert(data.sum.summands[0].tag == SUMMAND_ANON);
+  assert(data.sum.summands[0].sid.src == src + 6);
+  assert(data.sum.summands[0].sid.len == 1);
+  assert(sb_count(data.sum.summands[0].anon) == 1);
+  assert(data.sum.summands[0].anon[0].tag == TYPE_PTR);
+  assert(data.sum.summands[0].anon[0].src == src + 8);
+  assert(data.sum.summands[0].anon[0].len == 2);
+  assert(data.sum.summands[1].tag == SUMMAND_NAMED);
+  assert(data.sum.summands[1].sid.src == src + 14);
+  assert(data.sum.summands[1].sid.len == 1);
+  assert(sb_count(data.sum.summands[1].named.inners) == 1);
+  assert(sb_count(data.sum.summands[1].named.sids) == 1);
+  assert(data.sum.summands[1].named.inners[0].tag == TYPE_PTR);
+  assert(data.sum.summands[1].named.inners[0].src == src + 19);
+  assert(data.sum.summands[1].named.inners[0].len == 3);
+  assert(data.sum.summands[1].named.sids[0].src == src + 16);
+  assert(data.sum.summands[1].named.sids[0].len == 1);
+  free_inner_type(data);
 }
 
 int main(void)

@@ -383,6 +383,23 @@ void free_sb_types(AsgType *sb) {
   sb_free(sb);
 }
 
+void free_sb_summands(AsgSummand *sb) {
+  int i;
+  int count = sb_count(sb);
+  for (i = 0; i < count; i++) {
+    switch (sb[i].tag) {
+      case SUMMAND_ANON:
+        free_sb_types(sb[i].anon);
+        break;
+      case SUMMAND_NAMED:
+        free_sb_types(sb[i].named.inners);
+        sb_free(sb[i].named.sids);
+        break;
+    }
+  }
+  sb_free(sb);
+}
+
 size_t parse_type(const char *src, OoError *err, AsgType *data) {
   Token t = tokenize(src);
   err->tag = ERR_NONE;
@@ -390,6 +407,8 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
   size_t l = 0;
 
   AsgId id;
+  bool pub = false;
+  AsgSummand *summands = NULL;
   switch (t.tt) {
     case ID:
       l += parse_id(src, err, &id);
@@ -576,6 +595,67 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
       data->len = l;
       data->array = inner_array;
       return l;
+    case LANGLE:
+      l += t.len;
+
+      AsgSid *args = NULL;
+      AsgSid *arg = sb_add(args, 1);
+      l += parse_sid(src + l, err, arg);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_TYPE;
+        sb_free(args);
+        return l;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt != COMMA && t.tt != RANGLE) {
+        err->tag = ERR_TYPE;
+        err->tt = t.tt;
+        sb_free(args);
+        return l;
+      } else {
+        while (t.tt == COMMA) {
+          arg = sb_add(args, 1);
+          l += parse_sid(src + l, err, arg);
+          if (err->tag != ERR_NONE) {
+            sb_free(args);
+            return l;
+          }
+
+          t = tokenize(src + l);
+          l += t.len;
+        }
+        if (t.tt != RANGLE) {
+          sb_free(args);
+          err->tag = ERR_TYPE;
+          err->tt = t.tt;
+          return l;
+        }
+
+        t = tokenize(src + l);
+        if (t.tt != FAT_ARROW) {
+          sb_free(args);
+          err->tag = ERR_TYPE;
+          err->tt = t.tt;
+          return l;
+        }
+        l += t.len;
+
+        AsgType *inner = malloc(sizeof(AsgType));
+        l += parse_type(src + l, err, inner);
+        if (err->tag != ERR_NONE) {
+          sb_free(args);
+          free(inner);
+          return l;
+        }
+
+        data->tag = TYPE_GENERIC;
+        data->len = l;
+        data->generic.args = args;
+        data->generic.inner = inner;
+        return l;
+      }
     case LPAREN:
       // handles empty product, repeated product, anon fun, anon product,
       // named fun, named product
@@ -772,11 +852,184 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
           return l;
         }
       }
+    case PUB:
+      pub = true;
+      l += t.len;
+      t = tokenize(src + l);
+      if (t.tt != PIPE) {
+        err->tag = ERR_TYPE;
+        err->tt = t.tt;
+        return l + t.len;
+      }
+      __attribute__((fallthrough));
+    case PIPE:
+      while (t.tt == PIPE) {
+        AsgSummand *summand = sb_add(summands, 1);
+        l += parse_summand(src + l, err, summand);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_TYPE;
+          free_sb_summands(summands);
+          return l;
+        }
+
+        t = tokenize(src + l);
+      }
+
+      data->tag = TYPE_SUM;
+      data->len = l;
+      data->sum.pub = pub;
+      data->sum.summands = summands;
+      return l;
     default:
       err->tag = ERR_TYPE;
       err->tt = t.tt;
       data->len = t.len;
       return t.len;
+  }
+}
+
+size_t parse_summand(const char *src, OoError *err, AsgSummand *data) {
+  data->src = src;
+  size_t l = 0;
+  Token t = tokenize(src);
+  l += t.len;
+  if (t.tt != PIPE) {
+    err->tag = ERR_SUMMAND;
+    err->tt = t.tt;
+    return l;
+  }
+
+  l += parse_sid(src + l, err, &data->sid);
+  if (err->tag != ERR_NONE) {
+    err->tag = ERR_SUMMAND;
+    return l;
+  }
+
+  t = tokenize(src + l);
+  if (t.tt == LPAREN) {
+    l += t.len;
+    t = tokenize(src + l);
+
+    if (t.tt == ID) {
+      // named summand iff the next token is COLON
+      Token t2 = tokenize(src + l + t.len);
+      if (t2.tt == COLON) {
+        // named summand
+        AsgSid *sids = NULL;
+        AsgType *types = NULL;
+
+        AsgSid *sid = sb_add(sids, 1);
+        l += parse_sid(src + l, err, sid);
+        l += t2.len;
+        AsgType *type;
+        type = sb_add(types, 1);
+        l += parse_type(src + l, err, type);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_SUMMAND;
+          sb_free(sids);
+          free_sb_types(types);
+          return l;
+        }
+        t = tokenize(src + l);
+        l += t.len;
+
+        while (t.tt == COMMA) {
+          sid = sb_add(sids, 1);
+          l += parse_sid(src + l, err, sid);
+          if (err->tag != ERR_NONE) {
+            sb_free(sids);
+            free_sb_types(types);
+            err->tag = ERR_SUMMAND;
+            return l;
+          }
+
+          t = tokenize(src + l);
+          l += t.len;
+          if (t.tt != COLON) {
+            sb_free(sids);
+            free_sb_types(types);
+            err->tag = ERR_SUMMAND;
+            err->tt = t.tt;
+            return l;
+          }
+
+          type = sb_add(types, 1);
+          l += parse_type(src + l, err, type);
+          if (err->tag != ERR_NONE) {
+            sb_free(sids);
+            free_sb_types(types);
+            err->tag = ERR_SUMMAND;
+            return l;
+          }
+
+          t = tokenize(src + l);
+          l += t.len;
+        }
+
+        if (t.tt == RPAREN) {
+          data->tag = SUMMAND_NAMED;
+          data->len = l;
+          data->named.inners = types;
+          data->named.sids = sids;
+          return l;
+        } else {
+          err->tag = ERR_SUMMAND;
+          err->tt = t.tt;
+          sb_free(sids);
+          free_sb_types(types);
+          return l;
+        }
+      }
+    }
+
+    AsgType *inners = NULL;
+    AsgType *inner = sb_add(inners, 1);
+    l += parse_type(src + l, err, inner);
+    if (err->tag != ERR_NONE) {
+      err->tag = ERR_SUMMAND;
+      free_sb_types(inners);
+      return l;
+    }
+
+    t = tokenize(src + l);
+    l += t.len;
+    if (t.tt != COMMA && t.tt != RPAREN) {
+      err->tag = ERR_SUMMAND;
+      err->tt = t.tt;
+      free_sb_types(inners);
+      return l;
+    } else {
+      // anon app
+      while (t.tt == COMMA) {
+        inner = sb_add(inners, 1);
+        l += parse_type(src + l, err, inner);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_SUMMAND;
+          free_sb_types(inners);
+          return l;
+        }
+
+        t = tokenize(src + l);
+        l += t.len;
+      }
+      if (t.tt != RPAREN) {
+        free_sb_types(inners);
+        err->tag = ERR_SUMMAND;
+        err->tt = t.tt;
+        return l;
+      }
+
+      data->tag = SUMMAND_ANON;
+      data->len = l;
+      data->anon = inners;
+      return l;
+    }
+  } else {
+    // Identifier without parens (empty anon)
+    data->len = l;
+    data->tag = SUMMAND_ANON;
+    data->anon = NULL;
+    return l;
   }
 }
 
@@ -828,6 +1081,15 @@ void free_inner_type(AsgType data) {
       free_inner_id(data.app_named.tlf);
       free_sb_types(data.app_named.types);
       sb_free(data.app_named.sids);
+      break;
+    case TYPE_GENERIC:
+      free_inner_type(*data.generic.inner);
+      free(data.generic.inner);
+      sb_free(data.generic.args);
+      break;
+    case TYPE_SUM:
+      free_sb_summands(data.sum.summands);
+      break;
     default:
       return;
   }
