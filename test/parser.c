@@ -408,14 +408,175 @@ void test_type(void) {
   free_inner_type(data);
 }
 
-int main(void)
-{
+void test_pattern(void) {
+  char *src = "_";
+  OoError err;
+  AsgPattern data;
+
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_BLANK);
+  free_inner_pattern(data);
+
+  src = "mut abc";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_ID);
+  assert(data.id.mut);
+  assert(data.id.sid.src == src + 4);
+  assert(data.id.sid.len == 3);
+  assert(data.id.type == NULL);
+  free_inner_pattern(data);
+
+  src = "a: @A";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_ID);
+  assert(!data.id.mut);
+  assert(data.id.sid.src == src);
+  assert(data.id.sid.len == 1);
+  assert(data.id.type->tag == TYPE_PTR);
+  free_inner_pattern(data);
+
+  src = "42";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_LITERAL);
+  assert(data.lit.src == src);
+  assert(data.lit.len == 2);
+  assert(data.lit.tag == LITERAL_INT);
+  free_inner_pattern(data);
+
+  src = "0.0";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_LITERAL);
+  assert(data.lit.src == src);
+  assert(data.lit.len == 3);
+  assert(data.lit.tag == LITERAL_FLOAT);
+  free_inner_pattern(data);
+
+  src = "\"abc\"";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_LITERAL);
+  assert(data.lit.src == src);
+  assert(data.lit.len == 5);
+  assert(data.lit.tag == LITERAL_STRING);
+  free_inner_pattern(data);
+
+  src = "@a: @A";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_PTR);
+  assert(data.ptr->tag == PATTERN_ID);
+  assert(!data.ptr->id.mut);
+  assert(data.ptr->id.sid.src == src + 1);
+  assert(data.ptr->id.sid.len == 1);
+  assert(data.ptr->id.type->tag == TYPE_PTR);
+  free_inner_pattern(data);
+
+  src = "()";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_PRODUCT_ANON);
+  assert(sb_count(data.product_anon) == 0);
+  free_inner_pattern(data);
+
+  src = "(_)";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_PRODUCT_ANON);
+  assert(sb_count(data.product_anon) == 1);
+  free_inner_pattern(data);
+
+  src = "(_, _)";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_PRODUCT_ANON);
+  assert(sb_count(data.product_anon) == 2);
+  free_inner_pattern(data);
+
+  src = "(a = _)";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_PRODUCT_NAMED);
+  assert(sb_count(data.product_anon) == 1);
+  free_inner_pattern(data);
+
+  src = "(a = _, b = _)";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_PRODUCT_NAMED);
+  assert(sb_count(data.product_anon) == 2);
+  free_inner_pattern(data);
+
+  src = "| a";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_SUMMAND_ANON);
+  assert(sb_count(data.summand_anon.id.sids) == 1);
+  assert(sb_count(data.summand_anon.fields) == 0);
+  free_inner_pattern(data);
+
+  src = "| a(_)";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_SUMMAND_ANON);
+  assert(sb_count(data.summand_anon.id.sids) == 1);
+  assert(sb_count(data.summand_anon.fields) == 1);
+  free_inner_pattern(data);
+
+  src = "| a(_, _)";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_SUMMAND_ANON);
+  assert(sb_count(data.summand_anon.id.sids) == 1);
+  assert(sb_count(data.summand_anon.fields) == 2);
+  free_inner_pattern(data);
+
+  src = "| a(b = _)";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_SUMMAND_NAMED);
+  assert(sb_count(data.summand_anon.id.sids) == 1);
+  assert(sb_count(data.summand_anon.fields) == 1);
+  free_inner_pattern(data);
+
+  src = "| a(b = _, c = _)";
+  assert(parse_pattern(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == PATTERN_SUMMAND_NAMED);
+  assert(sb_count(data.summand_anon.id.sids) == 1);
+  assert(sb_count(data.summand_anon.fields) == 2);
+  free_inner_pattern(data);
+}
+
+int main(void) {
   test_sid();
   test_id();
   test_macro_inv();
   test_literal();
   test_repeat();
   test_type();
+  test_pattern();
 
   return 0;
 }

@@ -999,7 +999,7 @@ size_t parse_summand(const char *src, OoError *err, AsgSummand *data) {
       free_sb_types(inners);
       return l;
     } else {
-      // anon app
+      // anon summand
       while (t.tt == COMMA) {
         inner = sb_add(inners, 1);
         l += parse_type(src + l, err, inner);
@@ -1089,6 +1089,380 @@ void free_inner_type(AsgType data) {
       break;
     case TYPE_SUM:
       free_sb_summands(data.sum.summands);
+      break;
+    default:
+      return;
+  }
+}
+
+void free_sb_patterns(AsgPattern *sb) {
+  int i;
+  int count = sb_count(sb);
+  for (i = 0; i < count; i++) {
+    free_inner_pattern(sb[i]);
+  }
+  sb_free(sb);
+}
+
+size_t parse_pattern(const char *src, OoError *err, AsgPattern *data) {
+  Token t = tokenize(src);
+  err->tag = ERR_NONE;
+  data->src = src + (t.len - t.token_len);
+  size_t l = 0;
+
+  bool mut = false;
+  AsgType *type = NULL;
+  AsgId id;
+  switch (t.tt) {
+    case UNDERSCORE:
+      l += t.len;
+      data->tag = PATTERN_BLANK;
+      data->len = l;
+      return l;
+    case MUT:
+      mut = true;
+      l += t.len;
+      t = tokenize(src + l);
+      if (t.tt != ID) {
+        err->tag = ERR_PATTERN;
+        err->tt = t.tt;
+        return l + t.len;
+      }
+      __attribute__((fallthrough));
+    case ID:
+      l += parse_sid(src + l, err, &data->id.sid);
+
+      t = tokenize(src + l);
+      if (t.tt == COLON) {
+        l += t.len;
+        type = malloc(sizeof(AsgType));
+        l += parse_type(src + l, err, type);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_PATTERN;
+          free(type);
+          return l;
+        }
+      }
+
+      data->tag = PATTERN_ID;
+      data->len = l;
+      data->id.mut = mut;
+      data->id.type = type;
+      return l;
+    case INT:
+    case FLOAT:
+    case STRING:
+      l += parse_literal(src + l, err, &data->lit);
+      data->len = l;
+      data->tag = PATTERN_LITERAL;
+      return l;
+    case AT:
+      l += t.len;
+      AsgPattern *inner_ptr = malloc(sizeof(AsgPattern));
+      l += parse_pattern(src + l, err, inner_ptr);
+      if (err->tag != ERR_NONE) {
+        free(inner_ptr);
+      }
+      data->tag = PATTERN_PTR;
+      data->len = l;
+      data->ptr = inner_ptr;
+      return l;
+    case LPAREN:
+      l += t.len;
+
+      t = tokenize(src + l);
+      if (t.tt == RPAREN) {
+        l += t.len;
+        data->tag = PATTERN_PRODUCT_ANON;
+        data->len = l;
+        data->product_anon = NULL;
+        return l;
+      }
+
+      if (t.tt == ID) {
+        // named product iff the next token is EQUALS
+        Token t2 = tokenize(src + l + t.len);
+        if (t2.tt == EQ) {
+          // named product
+          AsgSid *sids = NULL;
+          AsgPattern *inners = NULL;
+
+          AsgSid *sid = sb_add(sids, 1);
+          l += parse_sid(src + l, err, sid);
+          l += t2.len;
+          AsgPattern *inner;
+          inner = sb_add(inners, 1);
+          l += parse_pattern(src + l, err, inner);
+          if (err->tag != ERR_NONE) {
+            sb_free(sids);
+            free_sb_patterns(inners);
+            return l;
+          }
+          t = tokenize(src + l);
+          l += t.len;
+
+          while (t.tt == COMMA) {
+            sid = sb_add(sids, 1);
+            l += parse_sid(src + l, err, sid);
+            if (err->tag != ERR_NONE) {
+              sb_free(sids);
+              free_sb_patterns(inners);
+              err->tag = ERR_PATTERN;
+              return l;
+            }
+
+            t = tokenize(src + l);
+            l += t.len;
+            if (t.tt != EQ) {
+              sb_free(sids);
+              free_sb_patterns(inners);
+              err->tag = ERR_PATTERN;
+              err->tt = t.tt;
+              return l;
+            }
+
+            inner = sb_add(inners, 1);
+            l += parse_pattern(src + l, err, inner);
+            if (err->tag != ERR_NONE) {
+              sb_free(sids);
+              free_sb_patterns(inners);
+              return l;
+            }
+
+            t = tokenize(src + l);
+            l += t.len;
+          }
+
+          if (t.tt == RPAREN) {
+            data->tag = PATTERN_PRODUCT_NAMED;
+            data->len = l;
+            data->product_named.inners = inners;
+            data->product_named.sids = sids;
+            return l;
+          } else {
+            err->tag = ERR_PATTERN;
+            err->tt = t.tt;
+            sb_free(sids);
+            free_sb_patterns(inners);
+            return l;
+          }
+        }
+      }
+
+      AsgPattern *inners = NULL;
+      AsgPattern *inner = sb_add(inners, 1);
+      l += parse_pattern(src + l, err, inner);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_PATTERN;
+        free_sb_patterns(inners);
+        return l;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt != COMMA && t.tt != RPAREN) {
+        err->tag = ERR_PATTERN;
+        err->tt = t.tt;
+        free_sb_patterns(inners);
+        return l;
+      } else {
+        // anon product
+        while (t.tt == COMMA) {
+          inner = sb_add(inners, 1);
+          l += parse_pattern(src + l, err, inner);
+          if (err->tag != ERR_NONE) {
+            free_sb_patterns(inners);
+            return l;
+          }
+
+          t = tokenize(src + l);
+          l += t.len;
+        }
+        if (t.tt != RPAREN) {
+          free_sb_patterns(inners);
+          err->tag = ERR_PATTERN;
+          err->tt = t.tt;
+          return l;
+        }
+
+        data->tag = PATTERN_PRODUCT_ANON;
+        data->len = l;
+        data->product_anon = inners;
+        return l;
+      }
+    case PIPE:
+      l += t.len;
+
+      l += parse_id(src + l, err, &id);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_PATTERN;
+        return l;
+      }
+
+      t = tokenize(src + l);
+      if (t.tt == LPAREN) {
+        l += t.len;
+        t = tokenize(src + l);
+
+        if (t.tt == ID) {
+          // named summand iff the next token is EQ
+          Token t2 = tokenize(src + l + t.len);
+          if (t2.tt == EQ) {
+            // named summand
+            AsgSid *sids = NULL;
+            AsgPattern *inners = NULL;
+
+            AsgSid *sid = sb_add(sids, 1);
+            l += parse_sid(src + l, err, sid);
+            l += t2.len;
+            AsgPattern *inner;
+            inner = sb_add(inners, 1);
+            l += parse_pattern(src + l, err, inner);
+            if (err->tag != ERR_NONE) {
+              err->tag = ERR_PATTERN;
+              sb_free(sids);
+              free_sb_patterns(inners);
+              return l;
+            }
+            t = tokenize(src + l);
+            l += t.len;
+
+            while (t.tt == COMMA) {
+              sid = sb_add(sids, 1);
+              l += parse_sid(src + l, err, sid);
+              if (err->tag != ERR_NONE) {
+                err->tag = ERR_PATTERN;
+                sb_free(sids);
+                free_sb_patterns(inners);
+                return l;
+              }
+
+              t = tokenize(src + l);
+              l += t.len;
+              if (t.tt != EQ) {
+                err->tag = ERR_PATTERN;
+                sb_free(sids);
+                free_sb_patterns(inners);
+                err->tt = t.tt;
+                return l;
+              }
+
+              inner = sb_add(inners, 1);
+              l += parse_pattern(src + l, err, inner);
+              if (err->tag != ERR_NONE) {
+                err->tag = ERR_PATTERN;
+                sb_free(sids);
+                free_sb_patterns(inners);
+                return l;
+              }
+
+              t = tokenize(src + l);
+              l += t.len;
+            }
+
+            if (t.tt == RPAREN) {
+              data->tag = PATTERN_SUMMAND_NAMED;
+              data->len = l;
+              data->summand_named.id = id;
+              data->summand_named.fields = inners;
+              data->summand_named.sids = sids;
+              return l;
+            } else {
+              err->tt = t.tt;
+              err->tag = ERR_PATTERN;
+              sb_free(sids);
+              free_sb_patterns(inners);
+              return l;
+            }
+          }
+        }
+
+        AsgPattern *inners = NULL;
+        AsgPattern *inner = sb_add(inners, 1);
+        l += parse_pattern(src + l, err, inner);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_PATTERN;
+          free_sb_patterns(inners);
+          return l;
+        }
+
+        t = tokenize(src + l);
+        l += t.len;
+        if (t.tt != COMMA && t.tt != RPAREN) {
+          err->tt = t.tt;
+          err->tag = ERR_PATTERN;
+          free_sb_patterns(inners);
+          return l;
+        } else {
+          // anon summand
+          while (t.tt == COMMA) {
+            inner = sb_add(inners, 1);
+            l += parse_pattern(src + l, err, inner);
+            if (err->tag != ERR_NONE) {
+              err->tag = ERR_PATTERN;
+              free_sb_patterns(inners);
+              return l;
+            }
+
+            t = tokenize(src + l);
+            l += t.len;
+          }
+          if (t.tt != RPAREN) {
+            err->tag = ERR_PATTERN;
+            free_sb_patterns(inners);
+            err->tt = t.tt;
+            return l;
+          }
+
+          data->tag = PATTERN_SUMMAND_ANON;
+          data->len = l;
+          data->summand_anon.id = id;
+          data->summand_anon.fields = inners;
+          return l;
+        }
+      } else {
+        // Identifier without parens (empty anon)
+        data->len = l;
+        data->tag = PATTERN_SUMMAND_ANON;
+        data->summand_anon.id = id;
+        data->summand_anon.fields = NULL;
+        return l;
+      }
+    default:
+      err->tag = ERR_TYPE;
+      err->tt = t.tt;
+      data->len = t.len;
+      return t.len;
+  }
+}
+
+void free_inner_pattern(AsgPattern data) {
+  switch (data.tag) {
+    case PATTERN_ID:
+      if (data.id.type) {
+        free_inner_type(*data.id.type);
+        free(data.id.type);
+      }
+      break;
+    case PATTERN_PTR:
+      free_inner_pattern(*data.ptr);
+      free(data.ptr);
+      break;
+    case PATTERN_PRODUCT_ANON:
+      free_sb_patterns(data.product_anon);
+      break;
+    case PATTERN_PRODUCT_NAMED:
+      free_sb_patterns(data.product_named.inners);
+      sb_free(data.product_named.sids);
+      break;
+    case PATTERN_SUMMAND_ANON:
+      free_inner_id(data.summand_anon.id);
+      free_sb_patterns(data.summand_anon.fields);
+      break;
+    case PATTERN_SUMMAND_NAMED:
+      free_inner_id(data.summand_named.id);
+      free_sb_patterns(data.summand_named.fields);
+      sb_free(data.summand_named.sids);
       break;
     default:
       return;

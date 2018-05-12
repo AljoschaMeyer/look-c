@@ -19,7 +19,6 @@ typedef struct AsgType AsgType;
 typedef struct AsgExp AsgExp;
 typedef struct AsgRepeat AsgRepeat;
 typedef struct AsgLValue AsgLValue;
-typedef struct AsgPatternIrref AsgPatternIrref;
 typedef struct AsgPattern AsgPattern;
 
 typedef enum {
@@ -469,12 +468,15 @@ typedef struct AsgExpAssign {
 } AsgExpAssign;
 
 typedef enum {
-  PATTERN_IRREF_ID,
-  PATTERN_IRREF_BLANK,
-  PATTERN_IRREF_PTR,
-  PATTERN_IRREF_PRODUCT_ANON,
-  PATTERN_IRREF_PRODUCT_NAMED
-} TagPatternIrref;
+  PATTERN_ID,
+  PATTERN_BLANK,
+  PATTERN_LITERAL,
+  PATTERN_PTR,
+  PATTERN_PRODUCT_ANON,
+  PATTERN_PRODUCT_NAMED,
+  PATTERN_SUMMAND_ANON,
+  PATTERN_SUMMAND_NAMED
+} TagPattern;
 
 typedef struct AsgPatternId {
   bool mut;
@@ -482,32 +484,39 @@ typedef struct AsgPatternId {
   AsgType *type; // may be null if no type annotation is present
 } AsgPatternId;
 
-typedef struct AsgPatternIrrefProductAnon {
-  AsgPatternIrref *inners;
-  size_t inners_len;
-} AsgPatternIrrefProductAnon;
+typedef struct AsgPatternProductNamed {
+  AsgPattern *inners; // stretchy buffer
+  AsgSid *sids; // stretchy buffer, same length as inners
+} AsgPatternProductNamed;
 
-typedef struct AsgPatternIrrefProductNamed {
-  AsgPatternIrref *inners;
-  AsgSid names; // same length as inners
-  size_t inners_len;
-} AsgPatternIrrefProductNamed;
+typedef struct AsgPatternSummandAnon {
+  AsgId id;
+  AsgPattern *fields; // stretchy buffer
+} AsgPatternSummandAnon;
 
-typedef struct AsgPatternIrref {
+typedef struct AsgPatternSummandNamed {
+  AsgId id;
+  AsgPattern *fields; // stretchy buffer
+  AsgSid *sids; // stretchy buffer,  same length as fields
+} AsgPatternSummandNamed;
+
+typedef struct AsgPattern {
   const char *src;
   size_t len;
-  TagPatternIrref tag;
+  TagPattern tag;
   union {
     AsgPatternId id;
-    char blank; // value is ignored
-    AsgPatternIrref *ptr;
-    AsgPatternIrrefProductAnon product_anon;
-    AsgPatternIrrefProductNamed product_named;
+    AsgLiteral lit;
+    AsgPattern *ptr;
+    AsgPattern *product_anon; // stretchy buffer
+    AsgPatternProductNamed product_named;
+    AsgPatternSummandAnon summand_anon;
+    AsgPatternSummandNamed summand_named;
   };
-} AsgPatternIrref;
+} AsgPattern;
 
 typedef struct AsgExpVal {
-  AsgPatternIrref lhs;
+  AsgPattern lhs;
   AsgExp *rhs; // is null for declarations without direct assignment
 } AsgExpVal;
 
@@ -528,57 +537,6 @@ typedef struct AsgExpWhile {
   AsgExp *cond;
   AsgExpBlock block;
 } AsgExpWhile;
-
-typedef enum {
-  PATTERN_ID,
-  PATTERN_BLANK,
-  PATTERN_LITERAL,
-  PATTERN_PTR,
-  PATTERN_PRODUCT_ANON,
-  PATTERN_PRODUCT_NAMED,
-  PATTERN_SUMMAND_ANON,
-  PATTERN_SUMMAND_NAMED
-} TagPattern;
-
-typedef struct AsgPatternProductAnon {
-  AsgPattern *inners;
-  size_t inners_len;
-} AsgPatternProductAnon;
-
-typedef struct AsgPatternProductNamed {
-  AsgPattern *inners;
-  AsgSid names; // same length as inners
-  size_t inners_len;
-} AsgPatternProductNamed;
-
-typedef struct AsgPatternSummandAnon {
-  AsgId id;
-  AsgPattern *fields;
-  size_t fields_len;
-} AsgPatternSummandAnon;
-
-typedef struct AsgPatternSummandNamed {
-  AsgId id;
-  AsgPattern *fields;
-  AsgSid *names; // same length as fields
-  size_t fields_len;
-} AsgPatternSummandNamed;
-
-typedef struct AsgPattern {
-  const char *src;
-  size_t len;
-  TagPattern tag;
-  union {
-    AsgPatternId id;
-    char blank; // value is ignored
-    AsgLiteral lit;
-    AsgPattern *ptr;
-    AsgPatternProductAnon product_anon;
-    AsgPatternProductNamed product_named;
-    AsgPatternSummandAnon summand_anon;
-    AsgPatternSummandNamed summane_named;
-  };
-} AsgPattern;
 
 typedef struct AsgExpCase {
   AsgExp *matcher;

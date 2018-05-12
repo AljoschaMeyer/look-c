@@ -15,7 +15,8 @@ typedef enum {
   ERR_REPEAT,
   ERR_BIN_OP,
   ERR_TYPE,
-  ERR_SUMMAND
+  ERR_SUMMAND,
+  ERR_PATTERN
 } OoTagError;
 
 typedef struct OoError {
@@ -39,7 +40,6 @@ size_t parse_item_val(const char *src, OoError *err, AsgItemVal *data);
 size_t parse_exp(const char *src, OoError *err, AsgExp *data);
 size_t parse_lvalue(const char *src, OoError *err, AsgLValue *data);
 size_t parse_pattern(const char *src, OoError *err, AsgPattern *data);
-size_t parse_patter_irref(const char *src, OoError *err, AsgPatternIrref *data);
 size_t parse_item_fun(const char *src, OoError *err, AsgItemFun *data);
 size_t parse_item_ffi_include(const char *src, OoError *err, AsgItemFfiInclude *data);
 size_t parse_item_ffi_val(const char *src, OoError *err, AsgItemFfiVal *data);
@@ -55,6 +55,7 @@ size_t parse_repeat(const char *src, OoError *err, AsgRepeat *data);
 void free_inner_id(AsgId data);
 void free_inner_repeat(AsgRepeat data);
 void free_inner_type(AsgType data);
-// TODO summand?
+void free_inner_summand(AsgSummand data);
+void free_inner_pattern(AsgPattern data);
 
 #endif
