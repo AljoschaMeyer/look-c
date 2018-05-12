@@ -86,6 +86,9 @@ Token tokenize(const char *src) {
         } else if (c == '~') {
           tt = TILDE;
           goto done;
+        } else if (c == '!') {
+          tt = NOT;
+          goto done;
         } else if (c == '(') {
           tt = LPAREN;
           goto done;

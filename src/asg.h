@@ -304,8 +304,56 @@ typedef struct AsgItemType {
 } AsgItemType;
 
 typedef enum {
+  PATTERN_ID,
+  PATTERN_BLANK,
+  PATTERN_LITERAL,
+  PATTERN_PTR,
+  PATTERN_PRODUCT_ANON,
+  PATTERN_PRODUCT_NAMED,
+  PATTERN_SUMMAND_ANON,
+  PATTERN_SUMMAND_NAMED
+} TagPattern;
+
+typedef struct AsgPatternId {
+  bool mut;
+  AsgSid sid;
+  AsgType *type; // may be null if no type annotation is present
+} AsgPatternId;
+
+typedef struct AsgPatternProductNamed {
+  AsgPattern *inners; // stretchy buffer
+  AsgSid *sids; // stretchy buffer, same length as inners
+} AsgPatternProductNamed;
+
+typedef struct AsgPatternSummandAnon {
+  AsgId id;
+  AsgPattern *fields; // stretchy buffer
+} AsgPatternSummandAnon;
+
+typedef struct AsgPatternSummandNamed {
+  AsgId id;
+  AsgPattern *fields; // stretchy buffer
+  AsgSid *sids; // stretchy buffer,  same length as fields
+} AsgPatternSummandNamed;
+
+typedef struct AsgPattern {
+  const char *src;
+  size_t len;
+  TagPattern tag;
+  union {
+    AsgPatternId id;
+    AsgLiteral lit;
+    AsgPattern *ptr;
+    AsgPattern *product_anon; // stretchy buffer
+    AsgPatternProductNamed product_named;
+    AsgPatternSummandAnon summand_anon;
+    AsgPatternSummandNamed summand_named;
+  };
+} AsgPattern;
+
+typedef enum {
   EXP_ID,
-  EXP_MACRO_INV,
+  EXP_MACRO,
   EXP_LITERAL,
   EXP_REF,
   EXP_REF_MUT,
@@ -351,15 +399,9 @@ typedef struct AsgExpProductRepeated {
   AsgRepeat repeat;
 } AsgExpProductRepeated;
 
-typedef struct AsgExpProductAnon {
-  AsgExp *inners;
-  size_t inners_len;
-} AsgExpProductAnon;
-
 typedef struct AsgExpProductNamed {
-  AsgExp *inners;
-  AsgSid *names; // same length as inners
-  size_t inners_len;
+  AsgExp *inners; // stretchy buffer
+  AsgSid *sids; // stretchy buffer, same length as inners
 } AsgExpProductNamed;
 
 typedef struct AsgExpProductAccessAnon {
@@ -423,97 +465,11 @@ typedef enum {
   ASSIGN_SHIFT_R
 } AsgAssignOp;
 
-typedef enum {
-  LVALUE_ID,
-  LVALUE_DEREF, // can not be assigned directly, but may contain a mutable ref
-  LVALUE_DEREF_MUT,
-  LVALUE_ARRAY_INDEX,
-  LVALUE_PRODUCT_ACCESS_ANON,
-  LVALUE_PRODUCT_ACCESS_NAMED
-} TagLValue;
-
-typedef struct AsgLValueArrayIndex {
-  AsgLValue *inner;
-  AsgExp *index;
-} AsgLValueArrayIndex;
-
-typedef struct AsgLValueProductAccessAnon {
-  AsgLValue *inner;
-  long field;
-} AsgLValueProductAccessAnon;
-
-typedef struct AsgLValueProductAccessNamed {
-  AsgLValue *inner;
-  AsgSid field;
-} AsgLValueProductAccessNamed;
-
-typedef struct AsgLValue {
-  const char *src;
-  size_t len;
-  TagLValue tag;
-  union {
-    AsgId id;
-    AsgLValue *deref;
-    AsgLValue *deref_mut;
-    AsgLValueArrayIndex array_index;
-    AsgLValueProductAccessAnon product_access_anon;
-    AsgLValueProductAccessNamed product_access_named;
-  };
-} AsgLValue;
-
 typedef struct AsgExpAssign {
   AsgAssignOp op;
-  AsgLValue lhs;
+  AsgExp *lhs;
   AsgExp *rhs;
 } AsgExpAssign;
-
-typedef enum {
-  PATTERN_ID,
-  PATTERN_BLANK,
-  PATTERN_LITERAL,
-  PATTERN_PTR,
-  PATTERN_PRODUCT_ANON,
-  PATTERN_PRODUCT_NAMED,
-  PATTERN_SUMMAND_ANON,
-  PATTERN_SUMMAND_NAMED
-} TagPattern;
-
-typedef struct AsgPatternId {
-  bool mut;
-  AsgSid sid;
-  AsgType *type; // may be null if no type annotation is present
-} AsgPatternId;
-
-typedef struct AsgPatternProductNamed {
-  AsgPattern *inners; // stretchy buffer
-  AsgSid *sids; // stretchy buffer, same length as inners
-} AsgPatternProductNamed;
-
-typedef struct AsgPatternSummandAnon {
-  AsgId id;
-  AsgPattern *fields; // stretchy buffer
-} AsgPatternSummandAnon;
-
-typedef struct AsgPatternSummandNamed {
-  AsgId id;
-  AsgPattern *fields; // stretchy buffer
-  AsgSid *sids; // stretchy buffer,  same length as fields
-} AsgPatternSummandNamed;
-
-typedef struct AsgPattern {
-  const char *src;
-  size_t len;
-  TagPattern tag;
-  union {
-    AsgPatternId id;
-    AsgLiteral lit;
-    AsgPattern *ptr;
-    AsgPattern *product_anon; // stretchy buffer
-    AsgPatternProductNamed product_named;
-    AsgPatternSummandAnon summand_anon;
-    AsgPatternSummandNamed summand_named;
-  };
-} AsgPattern;
 
 typedef struct AsgExpVal {
   AsgPattern lhs;
@@ -567,7 +523,7 @@ typedef struct AsgExp {
     AsgExp *array;
     AsgExpArrayIndex array_index;
     AsgExpProductRepeated product_repeated;
-    AsgExpProductAnon product_anon;
+    AsgExp *product_anon; // stretchy buffer
     AsgExpProductNamed product_named;
     AsgExpProductAccessAnon product_access_anon;
     AsgExpProductAccessNamed product_access_named;

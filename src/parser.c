@@ -687,9 +687,9 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
           return l;
         }
       } else if (t.tt == ID) {
-        // named fun, named product iff the next token is EQUALS
+        // named fun, named product iff the next token is COLON
         Token t2 = tokenize(src + l + t.len);
-        if (t2.tt == EQ) {
+        if (t2.tt == COLON) {
           // named fun, named product
           AsgSid *sids = NULL;
           AsgType *types = NULL;
@@ -720,7 +720,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
 
             t = tokenize(src + l);
             l += t.len;
-            if (t.tt != EQ) {
+            if (t.tt != COLON) {
               sb_free(sids);
               free_sb_types(types);
               err->tag = ERR_TYPE;
@@ -1463,6 +1463,337 @@ void free_inner_pattern(AsgPattern data) {
       free_inner_id(data.summand_named.id);
       free_sb_patterns(data.summand_named.fields);
       sb_free(data.summand_named.sids);
+      break;
+    default:
+      return;
+  }
+}
+
+void free_sb_exps(AsgExp *sb) {
+  int i;
+  int count = sb_count(sb);
+  for (i = 0; i < count; i++) {
+    free_inner_exp(sb[i]);
+  }
+  sb_free(sb);
+}
+
+size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data) {
+  Token t = tokenize(src);
+  err->tag = ERR_NONE;
+  data->src = src + (t.len - t.token_len);
+  size_t l = 0;
+
+  switch (t.tt) {
+    case ID:
+      l += parse_id(src, err, &data->id);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_EXP;
+      }
+      data->len = l;
+      data->tag = EXP_ID;
+      return l;
+    case DOLLAR:
+      l += parse_macro_inv(src, err, &data->macro);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_EXP;
+      }
+      data->tag = EXP_MACRO;
+      data->len = data->macro.len;
+      return l;
+    case INT:
+    case FLOAT:
+    case STRING:
+      l += parse_literal(src + l, err, &data->lit);
+      data->len = l;
+      data->tag = EXP_LITERAL;
+      return l;
+    case AT:
+      l += t.len;
+      AsgExp *inner_ref = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, inner_ref);
+      if (err->tag != ERR_NONE) {
+        free(inner_ref);
+      }
+      data->tag = EXP_REF;
+      data->len = l;
+      data->ref = inner_ref;
+      return l;
+    case TILDE:
+      l += t.len;
+      AsgExp *inner_ref_mut = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, inner_ref_mut);
+      if (err->tag != ERR_NONE) {
+        free(inner_ref_mut);
+      }
+      data->tag = EXP_REF_MUT;
+      data->len = l;
+      data->ref_mut = inner_ref_mut;
+      return l;
+    case LBRACKET:
+      l += t.len;
+      AsgExp *inner_array = malloc(sizeof(AsgExp));
+
+      l += parse_exp(src + l, err, inner_array);
+      if (err->tag != ERR_NONE) {
+        free(inner_array);
+        return l;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt != RBRACKET) {
+        err->tag = ERR_EXP;
+        err->tt = t.tt;
+        free(inner_array);
+        return l;
+      }
+
+      data->tag = EXP_ARRAY;
+      data->len = l;
+      data->array = inner_array;
+      return l;
+    case LPAREN:
+      // handles empty product, repeated product, anon product, named product
+      l += t.len;
+      t = tokenize(src + l);
+      if (t.tt == RPAREN) {
+        // empty (anon) product
+        l += t.len;
+
+        data->len = l;
+        data->tag = EXP_PRODUCT_ANON;
+        data->product_anon = NULL;
+        return l;
+      } else if (t.tt == ID) {
+        // named product iff the next token is EQ
+        Token t2 = tokenize(src + l + t.len);
+        if (t2.tt == EQ) {
+          // named fun, named product
+          AsgSid *sids = NULL;
+          AsgExp *inners = NULL;
+
+          AsgSid *sid = sb_add(sids, 1);
+          l += parse_sid(src + l, err, sid);
+          l += t2.len;
+          AsgExp *inner;
+          inner = sb_add(inners, 1);
+          l += parse_exp(src + l, err, inner);
+          if (err->tag != ERR_NONE) {
+            sb_free(sids);
+            free_sb_exps(inners);
+            return l;
+          }
+          t = tokenize(src + l);
+          l += t.len;
+
+          while (t.tt == COMMA) {
+            sid = sb_add(sids, 1);
+            l += parse_sid(src + l, err, sid);
+            if (err->tag != ERR_NONE) {
+              sb_free(sids);
+              free_sb_exps(inners);
+              err->tag = ERR_EXP;
+              return l;
+            }
+
+            t = tokenize(src + l);
+            l += t.len;
+            if (t.tt != EQ) {
+              sb_free(sids);
+              free_sb_exps(inners);
+              err->tag = ERR_EXP;
+              err->tt = t.tt;
+              return l;
+            }
+
+            inner = sb_add(inners, 1);
+            l += parse_exp(src + l, err, inner);
+            if (err->tag != ERR_NONE) {
+              sb_free(sids);
+              free_sb_exps(inners);
+              return l;
+            }
+
+            t = tokenize(src + l);
+            l += t.len;
+          }
+
+          data->tag = EXP_PRODUCT_NAMED;
+          data->len = l;
+          data->product_named.inners = inners;
+          data->product_named.sids = sids;
+          return l;
+        }
+      }
+      // repeated product, anon product
+      AsgExp *inners = NULL;
+      AsgExp *inner = sb_add(inners, 1);
+      l += parse_exp(src + l, err, inner);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_EXP;
+        free_sb_exps(inners);
+        return l;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt == SEMI) {
+        l += parse_repeat(src + l, err, &data->product_repeated.repeat);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_EXP;
+          free_sb_exps(inners);
+          return l;
+        }
+
+        t = tokenize(src + l);
+        l += t.len;
+        if (t.tt != RPAREN) {
+          err->tag = ERR_EXP;
+          free_sb_exps(inners);
+          err->tt = t.tt;
+          return l;
+        }
+
+        data->tag = EXP_PRODUCT_REPEATED;
+        data->len = l;
+        AsgExp *inner = malloc(sizeof(AsgExp));
+        memcpy(inner, inners, sizeof(AsgExp));
+        data->product_repeated.inner = inner;
+        sb_free(inners);
+        return l;
+      } else if (t.tt != COMMA && t.tt != RPAREN) {
+        err->tag = ERR_EXP;
+        free_sb_exps(inners);
+        err->tt = t.tt;
+        return l;
+      } else {
+        // anon product
+        while (t.tt == COMMA) {
+          inner = sb_add(inners, 1);
+          l += parse_exp(src + l, err, inner);
+          if (err->tag != ERR_NONE) {
+            free_sb_exps(inners);
+            return l;
+          }
+
+          t = tokenize(src + l);
+          l += t.len;
+        }
+        if (t.tt != RPAREN) {
+          err->tag = ERR_EXP;
+          free_sb_exps(inners);
+          err->tt = t.tt;
+          return l;
+        }
+
+        data->tag = EXP_PRODUCT_ANON;
+        data->len = l;
+        data->product_anon = inners;
+        return l;
+      }
+    case SIZEOF:
+      l += t.len;
+      AsgType *inner_size_of = malloc(sizeof(AsgType));
+      l += parse_type(src + l, err, inner_size_of);
+      if (err->tag != ERR_NONE) {
+        free(inner_size_of);
+      }
+      data->tag = EXP_SIZE_OF;
+      data->len = l;
+      data->size_of = inner_size_of;
+      return l;
+    case ALIGNOF:
+      l += t.len;
+      AsgType *inner_align_of = malloc(sizeof(AsgType));
+      l += parse_type(src + l, err, inner_align_of);
+      if (err->tag != ERR_NONE) {
+        free(inner_align_of);
+      }
+      data->tag = EXP_ALIGN_OF;
+      data->len = l;
+      data->align_of = inner_align_of;
+      return l;
+    case NOT:
+      l += t.len;
+      AsgExp *inner_not = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, inner_not);
+      if (err->tag != ERR_NONE) {
+        free(inner_not);
+      }
+      data->tag = EXP_NOT;
+      data->len = l;
+      data->exp_not = inner_not;
+      return l;
+    case MINUS:
+      l += t.len;
+      AsgExp *inner_negate = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, inner_negate);
+      if (err->tag != ERR_NONE) {
+        free(inner_negate);
+      }
+      data->tag = EXP_NEGATE;
+      data->len = l;
+      data->exp_negate = inner_negate;
+      return l;
+    default:
+      // TODO remove this
+      return l;
+  }
+}
+
+size_t parse_exp(const char *src, OoError *err, AsgExp *data) {
+  return parse_exp_non_left_recursive(src, err, data);
+  // deref, deref_mut, array_index, product_access_anon, product_access_named,
+  // fun_app_anon, fun_app_named, type_app_anon, type_app_named, cast
+
+  // TODO parse left-recursive expressions
+}
+
+void free_inner_exp(AsgExp data) {
+  switch (data.tag) {
+    case EXP_ID:
+      free_inner_id(data.id);
+      break;
+    case EXP_REF:
+      free_inner_exp(*data.ref);
+      free(data.ref);
+      break;
+    case EXP_REF_MUT:
+      free_inner_exp(*data.ref_mut);
+      free(data.ref_mut);
+      break;
+    case EXP_ARRAY:
+      free_inner_exp(*data.array);
+      free(data.array);
+      break;
+    case EXP_PRODUCT_REPEATED:
+      free_inner_exp(*data.product_repeated.inner);
+      free(data.product_repeated.inner);
+      free_inner_repeat(data.product_repeated.repeat);
+    break;
+    case EXP_PRODUCT_ANON:
+      free_sb_exps(data.product_anon);
+      break;
+    case EXP_PRODUCT_NAMED:
+      free_sb_exps(data.product_named.inners);
+      sb_free(data.product_named.sids);
+      break;
+    case EXP_SIZE_OF:
+      free_inner_type(*data.size_of);
+      free(data.size_of);
+      break;
+    case EXP_ALIGN_OF:
+      free_inner_type(*data.align_of);
+      free(data.align_of);
+      break;
+    case EXP_NOT:
+      free_inner_exp(*data.exp_not);
+      free(data.exp_not);
+      break;
+    case EXP_NEGATE:
+      free_inner_exp(*data.exp_negate);
+      free(data.exp_negate);
       break;
     default:
       return;

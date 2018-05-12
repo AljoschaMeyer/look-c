@@ -237,47 +237,47 @@ void test_type(void) {
   assert(sb_count(data.fun_anon.ret->product_anon) == 0);
   free_inner_type(data);
 
-  src = "(a = A)";
+  src = "(a: A)";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_PRODUCT_NAMED);
   assert(data.len == strlen(src));
   assert(sb_count(data.product_named.types) == 1);
   assert(data.product_named.types[0].tag == TYPE_ID);
-  assert(data.product_named.types[0].src == src + 5);
+  assert(data.product_named.types[0].src == src + 4);
   assert(data.product_named.types[0].len == 2);
   assert(sb_count(data.product_named.sids) == 1);
   assert(data.product_named.sids[0].src == src + 1);
   assert(data.product_named.sids[0].len == 1);
   free_inner_type(data);
 
-  src = "(a = A, b = @B)";
+  src = "(a: A, b: @B)";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_PRODUCT_NAMED);
   assert(data.len == strlen(src));
   assert(sb_count(data.product_named.types) == 2);
   assert(data.product_named.types[0].tag == TYPE_ID);
-  assert(data.product_named.types[0].src == src + 5);
+  assert(data.product_named.types[0].src == src + 4);
   assert(data.product_named.types[0].len == 2);
   assert(data.product_named.types[1].tag == TYPE_PTR);
-  assert(data.product_named.types[1].src == src + 12);
+  assert(data.product_named.types[1].src == src + 10);
   assert(data.product_named.types[1].len == 3);
   assert(sb_count(data.product_named.sids) == 2);
   assert(data.product_named.sids[0].src == src + 1);
   assert(data.product_named.sids[0].len == 1);
-  assert(data.product_named.sids[1].src == src + 8);
+  assert(data.product_named.sids[1].src == src + 7);
   assert(data.product_named.sids[1].len == 1);
   free_inner_type(data);
 
-  src = "(a = @A) -> @A";
+  src = "(a: @A) -> @A";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_FUN_NAMED);
   assert(data.len == strlen(src));
   assert(sb_count(data.fun_named.arg_types) == 1);
   assert(data.fun_named.arg_types[0].tag == TYPE_PTR);
-  assert(data.fun_named.arg_types[0].src == src + 5);
+  assert(data.fun_named.arg_types[0].src == src + 4);
   assert(data.fun_named.arg_types[0].len == 3);
   assert(data.fun_named.ret->tag == TYPE_PTR);
   assert(data.fun_named.ret->len == 3);
@@ -569,6 +569,203 @@ void test_pattern(void) {
   free_inner_pattern(data);
 }
 
+void test_exp(void) {
+  char *src = "abc::def";
+  OoError err;
+  AsgExp data;
+
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == EXP_ID);
+  assert(sb_count(data.id.sids) == 2);
+  free_inner_exp(data);
+
+  src = "$foo()";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_MACRO);
+  assert(data.len == strlen(src));
+  free_inner_exp(data);
+
+  src = "42";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == EXP_LITERAL);
+  assert(data.lit.src == src);
+  assert(data.lit.len == 2);
+  assert(data.lit.tag == LITERAL_INT);
+  free_inner_exp(data);
+
+  src = "0.0";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == EXP_LITERAL);
+  assert(data.lit.src == src);
+  assert(data.lit.len == 3);
+  assert(data.lit.tag == LITERAL_FLOAT);
+  free_inner_exp(data);
+
+  src = "\"abc\"";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == EXP_LITERAL);
+  assert(data.lit.src == src);
+  assert(data.lit.len == 5);
+  assert(data.lit.tag == LITERAL_STRING);
+  free_inner_exp(data);
+
+  src = "@a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_REF);
+  assert(data.len == strlen(src));
+  assert(data.ref->src == src + 1);
+  assert(data.ref->len == 1);
+  assert(data.ref->tag == EXP_ID);
+  free_inner_exp(data);
+
+  src = "~@a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_REF_MUT);
+  assert(data.len == strlen(src));
+  assert(data.ref_mut->src == src + 1);
+  assert(data.ref_mut->len == 2);
+  assert(data.ref_mut->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "[@a]";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_ARRAY);
+  assert(data.len == strlen(src));
+  assert(data.array->src == src + 1);
+  assert(data.array->len == 2);
+  assert(data.array->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "(@A; 42)";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_PRODUCT_REPEATED);
+  assert(data.len == strlen(src));
+  assert(data.product_repeated.inner->tag == EXP_REF);
+  assert(data.product_repeated.inner->src == src + 1);
+  assert(data.product_repeated.inner->len == 2);
+  assert(data.product_repeated.repeat.tag == REPEAT_INT);
+  free_inner_exp(data);
+
+  src = "( )";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_PRODUCT_ANON);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.product_anon) == 0);
+  free_inner_exp(data);
+
+  src = "(A)";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_PRODUCT_ANON);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.product_anon) == 1);
+  assert(data.product_anon[0].tag == EXP_ID);
+  assert(data.product_anon[0].src == src + 1);
+  assert(data.product_anon[0].len == 1);
+  free_inner_exp(data);
+
+  src = "(A, @B)";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_PRODUCT_ANON);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.product_anon) == 2);
+  assert(data.product_anon[0].tag == EXP_ID);
+  assert(data.product_anon[0].src == src + 1);
+  assert(data.product_anon[0].len == 1);
+  assert(data.product_anon[1].tag == EXP_REF);
+  assert(data.product_anon[1].src == src + 4);
+  assert(data.product_anon[1].len == 3);
+  free_inner_exp(data);
+
+  src = "(a = A)";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_PRODUCT_NAMED);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.product_named.inners) == 1);
+  assert(data.product_named.inners[0].tag == EXP_ID);
+  assert(data.product_named.inners[0].src == src + 5);
+  assert(data.product_named.inners[0].len == 2);
+  assert(sb_count(data.product_named.sids) == 1);
+  assert(data.product_named.sids[0].src == src + 1);
+  assert(data.product_named.sids[0].len == 1);
+  free_inner_exp(data);
+
+  src = "(a = A, b = @B)";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_PRODUCT_NAMED);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.product_named.inners) == 2);
+  assert(data.product_named.inners[0].tag == EXP_ID);
+  assert(data.product_named.inners[0].src == src + 5);
+  assert(data.product_named.inners[0].len == 2);
+  assert(data.product_named.inners[1].tag == EXP_REF);
+  assert(data.product_named.inners[1].src == src + 12);
+  assert(data.product_named.inners[1].len == 3);
+  assert(sb_count(data.product_named.sids) == 2);
+  assert(data.product_named.sids[0].src == src + 1);
+  assert(data.product_named.sids[0].len == 1);
+  assert(data.product_named.sids[1].src == src + 8);
+  assert(data.product_named.sids[1].len == 1);
+  free_inner_exp(data);
+
+  src = "sizeof @a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_SIZE_OF);
+  assert(data.len == strlen(src));
+  assert(data.size_of->src == src + 7);
+  assert(data.size_of->len == 3);
+  assert(data.size_of->tag == TYPE_PTR);
+  free_inner_exp(data);
+
+  src = "alignof @a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_ALIGN_OF);
+  assert(data.len == strlen(src));
+  assert(data.align_of->src == src + 8);
+  assert(data.align_of->len == 3);
+  assert(data.align_of->tag == TYPE_PTR);
+  free_inner_exp(data);
+
+  src = "!@a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_NOT);
+  assert(data.len == strlen(src));
+  assert(data.exp_not->src == src + 1);
+  assert(data.exp_not->len == 2);
+  assert(data.exp_not->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "-@a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_NEGATE);
+  assert(data.len == strlen(src));
+  assert(data.exp_negate->src == src + 1);
+  assert(data.exp_negate->len == 2);
+  assert(data.exp_negate->tag == EXP_REF);
+  free_inner_exp(data);
+}
+
 int main(void) {
   test_sid();
   test_id();
@@ -577,6 +774,7 @@ int main(void) {
   test_repeat();
   test_type();
   test_pattern();
+  test_exp();
 
   return 0;
 }
