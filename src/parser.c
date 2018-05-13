@@ -1693,9 +1693,9 @@ size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data)
         return l;
       }
     case SIZEOF:
-      l += t.len;
+      ;
       AsgType *inner_size_of = malloc(sizeof(AsgType));
-      l += parse_type(src + l, err, inner_size_of);
+      l += parse_size_of(src + l, err, inner_size_of);
       if (err->tag != ERR_NONE) {
         free(inner_size_of);
       }
@@ -1704,9 +1704,9 @@ size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data)
       data->size_of = inner_size_of;
       return l;
     case ALIGNOF:
-      l += t.len;
+      ;
       AsgType *inner_align_of = malloc(sizeof(AsgType));
-      l += parse_type(src + l, err, inner_align_of);
+      l += parse_align_of(src + l, err, inner_align_of);
       if (err->tag != ERR_NONE) {
         free(inner_align_of);
       }
@@ -1745,7 +1745,8 @@ size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data)
 size_t parse_exp(const char *src, OoError *err, AsgExp *data) {
   return parse_exp_non_left_recursive(src, err, data);
   // deref, deref_mut, array_index, product_access_anon, product_access_named,
-  // fun_app_anon, fun_app_named, type_app_anon, type_app_named, cast
+  // fun_app_anon, fun_app_named, type_app_anon, type_app_named, cast, bin_op,
+  // assign
 
   // TODO parse left-recursive expressions
 }

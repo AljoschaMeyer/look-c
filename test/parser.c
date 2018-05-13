@@ -725,23 +725,23 @@ void test_exp(void) {
   assert(data.product_named.sids[1].len == 1);
   free_inner_exp(data);
 
-  src = "sizeof @a";
+  src = "sizeof(@a)";
   assert(parse_exp(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == EXP_SIZE_OF);
   assert(data.len == strlen(src));
   assert(data.size_of->src == src + 7);
-  assert(data.size_of->len == 3);
+  assert(data.size_of->len == 2);
   assert(data.size_of->tag == TYPE_PTR);
   free_inner_exp(data);
 
-  src = "alignof @a";
+  src = "alignof(@a)";
   assert(parse_exp(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == EXP_ALIGN_OF);
   assert(data.len == strlen(src));
   assert(data.align_of->src == src + 8);
-  assert(data.align_of->len == 3);
+  assert(data.align_of->len == 2);
   assert(data.align_of->tag == TYPE_PTR);
   free_inner_exp(data);
 
