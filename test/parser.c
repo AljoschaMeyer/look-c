@@ -844,6 +844,145 @@ void test_exp(void) {
   assert(sb_count(data.block.attrs[0]) == 0);
   assert(sb_count(data.block.attrs[1]) == 2);
   free_inner_exp(data);
+
+  src = "if a {}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_IF);
+  assert(data.len == strlen(src));
+  assert(data.exp_if.cond->tag == EXP_ID);
+  assert(sb_count(data.exp_if.if_block.exps) == 0);
+  assert(sb_count(data.exp_if.else_block.exps) == 0);
+  free_inner_exp(data);
+
+  src = "if a {} else {}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_IF);
+  assert(data.len == strlen(src));
+  assert(data.exp_if.cond->tag == EXP_ID);
+  assert(sb_count(data.exp_if.if_block.exps) == 0);
+  assert(sb_count(data.exp_if.else_block.exps) == 0);
+  free_inner_exp(data);
+
+  src = "if a {} else if b {}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_IF);
+  assert(data.len == strlen(src));
+  assert(data.exp_if.cond->tag == EXP_ID);
+  assert(sb_count(data.exp_if.if_block.exps) == 0);
+  assert(sb_count(data.exp_if.else_block.exps) == 1);
+  assert(data.exp_if.else_block.exps[0].tag == EXP_IF);
+  assert(data.exp_if.else_block.exps[0].exp_if.cond->tag == EXP_ID);
+  assert(sb_count(data.exp_if.else_block.exps[0].exp_if.if_block.exps) == 0);
+  assert(sb_count(data.exp_if.else_block.exps[0].exp_if.else_block.exps) == 0);
+  free_inner_exp(data);
+
+  src = "while a {}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_WHILE);
+  assert(data.len == strlen(src));
+  assert(data.exp_while.cond->tag == EXP_ID);
+  assert(sb_count(data.exp_while.block.exps) == 0);
+  free_inner_exp(data);
+
+  src = "case a {}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_CASE);
+  assert(data.len == strlen(src));
+  assert(data.exp_case.matcher->tag == EXP_ID);
+  assert(sb_count(data.exp_case.patterns) == 0);
+  free_inner_exp(data);
+
+  src = "case a {_{}}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_CASE);
+  assert(data.len == strlen(src));
+  assert(data.exp_case.matcher->tag == EXP_ID);
+  assert(sb_count(data.exp_case.patterns) == 1);
+  assert(sb_count(data.exp_case.blocks) == 1);
+  free_inner_exp(data);
+
+  src = "case a {_{}_{}}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_CASE);
+  assert(data.len == strlen(src));
+  assert(data.exp_case.matcher->tag == EXP_ID);
+  assert(sb_count(data.exp_case.patterns) == 2);
+  assert(sb_count(data.exp_case.blocks) == 2);
+  free_inner_exp(data);
+
+  src = "loop a {}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_LOOP);
+  assert(data.len == strlen(src));
+  assert(data.exp_loop.matcher->tag == EXP_ID);
+  assert(sb_count(data.exp_loop.patterns) == 0);
+  free_inner_exp(data);
+
+  src = "loop a {_{}}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_LOOP);
+  assert(data.len == strlen(src));
+  assert(data.exp_loop.matcher->tag == EXP_ID);
+  assert(sb_count(data.exp_loop.patterns) == 1);
+  assert(sb_count(data.exp_loop.blocks) == 1);
+  free_inner_exp(data);
+
+  src = "loop a {_{}_{}}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_LOOP);
+  assert(data.len == strlen(src));
+  assert(data.exp_loop.matcher->tag == EXP_ID);
+  assert(sb_count(data.exp_loop.patterns) == 2);
+  assert(sb_count(data.exp_loop.blocks) == 2);
+  free_inner_exp(data);
+
+  src = "return @a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_RETURN);
+  assert(data.len == strlen(src));
+  assert(data.exp_return->src == src + 7);
+  assert(data.exp_return->len == 3);
+  assert(data.exp_return->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "break @a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BREAK);
+  assert(data.len == strlen(src));
+  assert(data.exp_break->src == src + 6);
+  assert(data.exp_break->len == 3);
+  assert(data.exp_break->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "goto a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_GOTO);
+  assert(data.len == strlen(src));
+  assert(data.exp_goto.src == src + 5);
+  assert(data.exp_goto.len == 1);
+  free_inner_exp(data);
+
+  src = "label a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_LABEL);
+  assert(data.len == strlen(src));
+  assert(data.exp_label.src == src + 6);
+  assert(data.exp_label.len == 1);
+  free_inner_exp(data);
 }
 
 void test_meta(void) {

@@ -1697,7 +1697,6 @@ size_t parse_block(const char *src, OoError *err, AsgBlock *data) {
     l += t.len;
   }
 
-
   if (t.tt == RBRACE) {
     data->len = l;
     data->exps = exps;
@@ -1714,6 +1713,15 @@ size_t parse_block(const char *src, OoError *err, AsgBlock *data) {
 void free_inner_block(AsgBlock data) {
   free_sb_exps(data.exps);
   free_sb_sb_meta(data.attrs);
+}
+
+void free_sb_blocks(AsgBlock *sb) {
+  int i;
+  int count = sb_count(sb);
+  for (i = 0; i < count; i++) {
+    free_inner_block(sb[i]);
+  }
+  sb_free(sb);
 }
 
 size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data) {
@@ -2011,9 +2019,237 @@ size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data)
         data->len = l;
         return l;
       }
-    default:
-      // TODO remove this
+    case IF:
+      l += t.len;
+      AsgExp *cond = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, cond);
+      if (err->tag != ERR_NONE) {
+        free(cond);
+        return l;
+      }
+
+      l += parse_block(src + l, err, &data->exp_if.if_block);
+      if (err->tag != ERR_NONE) {
+        free(cond);
+        return l;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt != ELSE) {
+        data->tag = EXP_IF;
+        data->len = l;
+        data->exp_if.cond = cond;
+        data->exp_if.else_block.src = NULL;
+        data->exp_if.else_block.len = 0;
+        data->exp_if.else_block.exps = NULL;
+        data->exp_if.else_block.attrs = NULL;
+        return l;
+      } else {
+        t = tokenize(src + l);
+        if (t.tt == IF) {
+          // treat this as a block containing a single expression
+          data->exp_if.else_block.exps = NULL;
+          data->exp_if.else_block.attrs = NULL;
+          AsgExp *exp = sb_add(data->exp_if.else_block.exps, 1);
+          l += parse_exp(src + l, err, exp);
+          if (err->tag != ERR_NONE) {
+            free(cond);
+            free_inner_block(data->exp_if.if_block);
+            free_inner_block(data->exp_if.else_block);
+            return l;
+          }
+
+          data->tag = EXP_IF;
+          data->len = l;
+          data->exp_if.cond = cond;
+          data->exp_if.else_block.src = exp->src;
+          data->exp_if.else_block.len = exp->len;
+          return l;
+        } else {
+          l += parse_block(src + l, err, &data->exp_if.else_block);
+          if (err->tag != ERR_NONE) {
+            free(cond);
+            free_inner_block(data->exp_if.if_block);
+            return l;
+          }
+
+          data->tag = EXP_IF;
+          data->len = l;
+          data->exp_if.cond = cond;
+          return l;
+        }
+      }
+    case WHILE:
+      l += t.len;
+      AsgExp *cond_while = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, cond_while);
+      if (err->tag != ERR_NONE) {
+        free(cond_while);
+        return l;
+      }
+
+      l += parse_block(src + l, err, &data->exp_while.block);
+      if (err->tag != ERR_NONE) {
+        free(cond_while);
+        return l;
+      }
+
+      data->tag = EXP_WHILE;
+      data->len = l;
+      data->exp_while.cond = cond_while;
       return l;
+    case CASE:
+      l += t.len;
+      AsgExp *matcher_case = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, matcher_case);
+      if (err->tag != ERR_NONE) {
+        free(matcher_case);
+        return l;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt != LBRACE) {
+        err->tag = ERR_EXP;
+        err->tt = t.tt;
+        free(matcher_case);
+        return l;
+      }
+
+      AsgPattern *patterns_case = NULL;
+      AsgBlock *blocks_case = NULL;
+
+      t = tokenize(src + l);
+      while (t.tt != RBRACE) {
+        AsgPattern *pattern = sb_add(patterns_case, 1);
+        l += parse_pattern(src + l, err, pattern);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_EXP;
+          free(matcher_case);
+          free_sb_patterns(patterns_case);
+          free_sb_blocks(blocks_case);
+          return l;
+        }
+
+        AsgBlock *block = sb_add(blocks_case, 1);
+        l += parse_block(src + l, err, block);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_EXP;
+          free(matcher_case);
+          free_sb_patterns(patterns_case);
+          free_sb_blocks(blocks_case);
+          return l;
+        }
+
+        t = tokenize(src + l);
+      }
+      l += t.len;
+
+      data->tag = EXP_CASE;
+      data->len = l;
+      data->exp_case.matcher = matcher_case;
+      data->exp_case.patterns = patterns_case;
+      data->exp_case.blocks = blocks_case;
+      return l;
+    case LOOP:
+      l += t.len;
+      AsgExp *matcher_loop = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, matcher_loop);
+      if (err->tag != ERR_NONE) {
+        free(matcher_loop);
+        return l;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt != LBRACE) {
+        err->tag = ERR_EXP;
+        err->tt = t.tt;
+        free(matcher_loop);
+        return l;
+      }
+
+      AsgPattern *patterns_loop = NULL;
+      AsgBlock *blocks_loop = NULL;
+
+      t = tokenize(src + l);
+      while (t.tt != RBRACE) {
+        AsgPattern *pattern = sb_add(patterns_loop, 1);
+        l += parse_pattern(src + l, err, pattern);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_EXP;
+          free(matcher_loop);
+          free_sb_patterns(patterns_loop);
+          free_sb_blocks(blocks_loop);
+          return l;
+        }
+
+        AsgBlock *block = sb_add(blocks_loop, 1);
+        l += parse_block(src + l, err, block);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_EXP;
+          free(matcher_loop);
+          free_sb_patterns(patterns_loop);
+          free_sb_blocks(blocks_loop);
+          return l;
+        }
+
+        t = tokenize(src + l);
+      }
+      l += t.len;
+
+      data->tag = EXP_LOOP;
+      data->len = l;
+      data->exp_loop.matcher = matcher_loop;
+      data->exp_loop.patterns = patterns_loop;
+      data->exp_loop.blocks = blocks_loop;
+      return l;
+    case RETURN:
+      l += t.len;
+      AsgExp *inner_return = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, inner_return);
+      if (err->tag != ERR_NONE) {
+        free(inner_return);
+      }
+      data->tag = EXP_RETURN;
+      data->len = l;
+      data->exp_return = inner_return;
+      return l;
+    case BREAK:
+      l += t.len;
+      AsgExp *inner_break = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, inner_break);
+      if (err->tag != ERR_NONE) {
+        free(inner_break);
+      }
+      data->tag = EXP_BREAK;
+      data->len = l;
+      data->exp_break = inner_break;
+      return l;
+    case GOTO:
+      l += t.len;
+      l += parse_sid(src + l, err, &data->exp_goto);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_EXP;
+      }
+      data->tag = EXP_GOTO;
+      data->len = l;
+      return l;
+    case LABEL:
+      l += t.len;
+      l += parse_sid(src + l, err, &data->exp_label);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_EXP;
+      }
+      data->tag = EXP_LABEL;
+      data->len = l;
+      return l;
+    default:
+    err->tag = ERR_EXP;
+    err->tt = t.tt;
+    data->len = t.len;
+    return t.len;
   }
 }
 
@@ -2081,6 +2317,37 @@ void free_inner_exp(AsgExp data) {
       break;
     case EXP_BLOCK:
       free_inner_block(data.block);
+      break;
+    case EXP_IF:
+      free_inner_exp(*data.exp_if.cond);
+      free(data.exp_if.cond);
+      free_inner_block(data.exp_if.if_block);
+      free_inner_block(data.exp_if.else_block);
+      break;
+    case EXP_WHILE:
+      free_inner_exp(*data.exp_while.cond);
+      free(data.exp_while.cond);
+      free_inner_block(data.exp_while.block);
+      break;
+    case EXP_CASE:
+      free_inner_exp(*data.exp_case.matcher);
+      free(data.exp_case.matcher);
+      free_sb_patterns(data.exp_case.patterns);
+      free_sb_blocks(data.exp_case.blocks);
+      break;
+    case EXP_LOOP:
+      free_inner_exp(*data.exp_loop.matcher);
+      free(data.exp_loop.matcher);
+      free_sb_patterns(data.exp_loop.patterns);
+      free_sb_blocks(data.exp_loop.blocks);
+      break;
+    case EXP_RETURN:
+      free_inner_exp(*data.exp_return);
+      free(data.exp_return);
+      break;
+    case EXP_BREAK:
+      free_inner_exp(*data.exp_break);
+      free(data.exp_break);
       break;
     default:
       return;

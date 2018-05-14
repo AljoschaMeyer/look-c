@@ -379,13 +379,13 @@ typedef enum {
   EXP_ASSIGN,
   EXP_VAL,
   EXP_VAL_ASSIGN,
+  EXP_BLOCK,
   EXP_IF,
   EXP_CASE,
   EXP_WHILE,
   EXP_LOOP,
   EXP_RETURN,
   EXP_BREAK,
-  EXP_BLOCK,
   EXP_GOTO,
   EXP_LABEL
 } ExpTag;
@@ -480,8 +480,8 @@ typedef struct AsgExpValAssign {
 typedef struct AsgExpIf {
   AsgExp *cond;
   AsgBlock if_block;
-  AsgBlock *else_block; // is null if no else is present
-} AsgExpIf; // TODO instead of using null for no if, add AsgExpIfElse struct
+  AsgBlock else_block; // no else is represented as an empty AsgBlock
+} AsgExpIf;
 
 typedef struct AsgExpWhile {
   AsgExp *cond;
@@ -490,16 +490,14 @@ typedef struct AsgExpWhile {
 
 typedef struct AsgExpCase {
   AsgExp *matcher;
-  AsgPattern *patterns;
-  AsgBlock *blocks; // same length as patterns
-  size_t pattern_len;
+  AsgPattern *patterns; // stretchy buffer
+  AsgBlock *blocks; // stretchy buffer, same length as patterns
 } AsgExpCase;
 
 typedef struct AsgExpLoop {
   AsgExp *matcher;
-  AsgPattern *patterns;
-  AsgBlock *blocks; // same length as patterns
-  size_t pattern_len;
+  AsgPattern *patterns; // stretchy buffer
+  AsgBlock *blocks; // stretchy buffer, same length as patterns
 } AsgExpLoop;
 
 typedef struct AsgExp {
@@ -538,7 +536,7 @@ typedef struct AsgExp {
     AsgExpIf exp_if;
     AsgExpCase exp_case;
     AsgExpWhile exp_while;
-    AsgExpLoop loop;
+    AsgExpLoop exp_loop;
     AsgExp *exp_return;
     AsgExp *exp_break;
     AsgSid exp_goto;
