@@ -17,7 +17,10 @@ typedef enum {
   ERR_TYPE,
   ERR_SUMMAND,
   ERR_PATTERN,
-  ERR_EXP
+  ERR_EXP,
+  ERR_BLOCK,
+  ERR_ATTR,
+  ERR_META
 } OoTagError;
 
 typedef struct OoError {
@@ -39,6 +42,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data);
 size_t parse_summand(const char *src, OoError *err, AsgSummand *data);
 size_t parse_item_val(const char *src, OoError *err, AsgItemVal *data);
 size_t parse_exp(const char *src, OoError *err, AsgExp *data);
+size_t parse_block(const char *src, OoError *err, AsgBlock *data);
 size_t parse_pattern(const char *src, OoError *err, AsgPattern *data);
 size_t parse_item_fun(const char *src, OoError *err, AsgItemFun *data);
 size_t parse_item_ffi_include(const char *src, OoError *err, AsgItemFfiInclude *data);
@@ -58,5 +62,7 @@ void free_inner_type(AsgType data);
 void free_inner_summand(AsgSummand data);
 void free_inner_pattern(AsgPattern data);
 void free_inner_exp(AsgExp data);
+void free_inner_block(AsgBlock data);
+void free_inner_meta(AsgMeta data);
 
 #endif

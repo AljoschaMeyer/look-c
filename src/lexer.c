@@ -105,7 +105,7 @@ Token tokenize(const char *src) {
           tt = LBRACE;
           goto done;
         } else if (c == '}') {
-          tt = RBRACKET;
+          tt = RBRACE;
           goto done;
         } else if (c == '<') {
           tt = LANGLE;

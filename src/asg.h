@@ -20,6 +20,7 @@ typedef struct AsgExp AsgExp;
 typedef struct AsgRepeat AsgRepeat;
 typedef struct AsgLValue AsgLValue;
 typedef struct AsgPattern AsgPattern;
+typedef struct AsgBlock AsgBlock;
 
 typedef enum {
   BINDING_NONE, // the sid does not resolve to a binding (because it defines one)
@@ -137,23 +138,15 @@ typedef enum {
   META_NESTED
 } TagMeta;
 
-typedef struct AsgMetaNested {
-  const char *src;
-  size_t len;
-  AsgMeta *inner;
-  size_t inner_len;
-} AsgMetaNested;
-
 typedef struct AsgMeta {
   const char *src;
   size_t len;
   TagMeta tag;
-  char *name;
+  const char *name;
   size_t name_len;
   union {
-    char nullary; // never used
     AsgLiteral unary;
-    AsgMetaNested nested;
+    AsgMeta *nested; // stretchy buffer
   };
 } AsgMeta;
 
@@ -351,6 +344,13 @@ typedef struct AsgPattern {
   };
 } AsgPattern;
 
+typedef struct AsgBlock {
+  const char *src;
+  size_t len;
+  AsgExp *exps; // stretchy buffer
+  AsgMeta **attrs; // stretchy buffer of stretchy buffers, same length as exps
+} AsgBlock;
+
 typedef enum {
   EXP_ID,
   EXP_MACRO,
@@ -378,6 +378,7 @@ typedef enum {
   EXP_BIN_OP,
   EXP_ASSIGN,
   EXP_VAL,
+  EXP_VAL_ASSIGN,
   EXP_IF,
   EXP_CASE,
   EXP_WHILE,
@@ -471,40 +472,33 @@ typedef struct AsgExpAssign {
   AsgExp *rhs;
 } AsgExpAssign;
 
-typedef struct AsgExpVal {
+typedef struct AsgExpValAssign {
   AsgPattern lhs;
-  AsgExp *rhs; // is null for declarations without direct assignment
-} AsgExpVal;
-
-typedef struct AsgExpBlock {
-  AsgExp *exps;
-  AsgMeta **annotations; // same length as exps
-  size_t *annotation_lens; // same length as annotations
-  size_t exps_len;
-} AsgExpBlock;
+  AsgExp *rhs;
+} AsgExpValAssign;
 
 typedef struct AsgExpIf {
   AsgExp *cond;
-  AsgExpBlock if_block;
-  AsgExpBlock *else_block; // is null if no else is present
-} AsgExpIf;
+  AsgBlock if_block;
+  AsgBlock *else_block; // is null if no else is present
+} AsgExpIf; // TODO instead of using null for no if, add AsgExpIfElse struct
 
 typedef struct AsgExpWhile {
   AsgExp *cond;
-  AsgExpBlock block;
+  AsgBlock block;
 } AsgExpWhile;
 
 typedef struct AsgExpCase {
   AsgExp *matcher;
   AsgPattern *patterns;
-  AsgExpBlock *blocks; // same length as patterns
+  AsgBlock *blocks; // same length as patterns
   size_t pattern_len;
 } AsgExpCase;
 
 typedef struct AsgExpLoop {
   AsgExp *matcher;
   AsgPattern *patterns;
-  AsgExpBlock *blocks; // same length as patterns
+  AsgBlock *blocks; // same length as patterns
   size_t pattern_len;
 } AsgExpLoop;
 
@@ -538,14 +532,15 @@ typedef struct AsgExp {
     AsgExp *exp_negate;
     AsgExpBinOp bin_op;
     AsgExpAssign assign;
-    AsgExpVal val;
+    AsgPattern val;
+    AsgExpValAssign val_assign;
+    AsgBlock block;
     AsgExpIf exp_if;
     AsgExpCase exp_case;
     AsgExpWhile exp_while;
     AsgExpLoop loop;
     AsgExp *exp_return;
     AsgExp *exp_break;
-    AsgExpBlock block;
     AsgSid exp_goto;
     AsgSid exp_label;
   };
@@ -564,7 +559,7 @@ typedef struct AsgItemFun {
   AsgType *arg_types; // same length as arg_sids
   size_t arg_sids_len;
   AsgType *ret; // may be null if return type is omitted
-  AsgExpBlock *body;
+  AsgBlock *body;
 } AsgItemFun;
 
 typedef struct AsgItemFfiInclude {

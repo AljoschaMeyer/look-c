@@ -764,6 +764,131 @@ void test_exp(void) {
   assert(data.exp_negate->len == 2);
   assert(data.exp_negate->tag == EXP_REF);
   free_inner_exp(data);
+
+  src = "val a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_VAL);
+  assert(data.len == strlen(src));
+  assert(data.val.src == src + 4);
+  assert(data.val.len == 2);
+  assert(data.val.tag == PATTERN_ID);
+  free_inner_exp(data);
+
+  src = "val a = @b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_VAL_ASSIGN);
+  assert(data.len == strlen(src));
+  assert(data.val_assign.lhs.src == src + 4);
+  assert(data.val_assign.lhs.len == 2);
+  assert(data.val_assign.lhs.tag == PATTERN_ID);
+  assert(data.val_assign.rhs->src == src + 8);
+  assert(data.val_assign.rhs->len == 3);
+  assert(data.val_assign.rhs->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "{}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BLOCK);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.block.exps) == 0);
+  assert(sb_count(data.block.attrs) == 0);
+  free_inner_exp(data);
+
+  src = "{a}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BLOCK);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.block.exps) == 1);
+  assert(data.block.exps[0].tag == EXP_ID);
+  assert(sb_count(data.block.attrs) == 1);
+  assert(sb_count(data.block.attrs[0]) == 0);
+  free_inner_exp(data);
+
+  src = "{a; b}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BLOCK);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.block.exps) == 2);
+  assert(data.block.exps[0].tag == EXP_ID);
+  assert(data.block.exps[1].tag == EXP_ID);
+  assert(sb_count(data.block.attrs) == 2);
+  assert(sb_count(data.block.attrs[0]) == 0);
+  assert(sb_count(data.block.attrs[1]) == 0);
+  free_inner_exp(data);
+
+  src = "{#[foo]#[bar]a}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BLOCK);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.block.exps) == 1);
+  assert(data.block.exps[0].tag == EXP_ID);
+  assert(sb_count(data.block.attrs) == 1);
+  assert(sb_count(data.block.attrs[0]) == 2);
+  free_inner_exp(data);
+
+  src = "{a; #[foo]#[bar]b}";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BLOCK);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.block.exps) == 2);
+  assert(data.block.exps[0].tag == EXP_ID);
+  assert(data.block.exps[1].tag == EXP_ID);
+  assert(sb_count(data.block.attrs) == 2);
+  assert(sb_count(data.block.attrs[0]) == 0);
+  assert(sb_count(data.block.attrs[1]) == 2);
+  free_inner_exp(data);
+}
+
+void test_meta(void) {
+  char *src = "  foo";
+  OoError err;
+  AsgMeta data;
+
+  assert(parse_meta(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == META_NULLARY);
+  assert(data.len == strlen(src));
+  assert(data.name_len == 3);
+  assert(strncmp(data.name, "foo", 3) == 0);
+  free_inner_meta(data);
+
+  src = "foo = 42";
+  assert(parse_meta(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == META_UNARY);
+  assert(data.len == strlen(src));
+  assert(data.name_len == 3);
+  assert(strncmp(data.name, "foo", 3) == 0);
+  assert(data.unary.len == 2);
+  assert(data.unary.tag == LITERAL_INT);
+  free_inner_meta(data);
+
+  src = "foo(bar)";
+  assert(parse_meta(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == META_NESTED);
+  assert(data.len == strlen(src));
+  assert(data.name_len == 3);
+  assert(strncmp(data.name, "foo", 3) == 0);
+  assert(sb_count(data.nested) == 1);
+  free_inner_meta(data);
+
+  src = "foo(bar, baz = 42)";
+  assert(parse_meta(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == META_NESTED);
+  assert(data.len == strlen(src));
+  assert(data.name_len == 3);
+  assert(strncmp(data.name, "foo", 3) == 0);
+  assert(sb_count(data.nested) == 2);
+  free_inner_meta(data);
 }
 
 int main(void) {
@@ -775,6 +900,7 @@ int main(void) {
   test_type();
   test_pattern();
   test_exp();
+  test_meta();
 
   return 0;
 }

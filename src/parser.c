@@ -1469,6 +1469,153 @@ void free_inner_pattern(AsgPattern data) {
   }
 }
 
+void free_sb_meta(AsgMeta *sb) {
+  int i;
+  int count = sb_count(sb);
+  for (i = 0; i < count; i++) {
+    free_inner_meta(sb[i]);
+  }
+  sb_free(sb);
+}
+
+void free_sb_sb_meta(AsgMeta **sb) {
+  int i;
+  int count = sb_count(sb);
+  for (i = 0; i < count; i++) {
+    free_sb_meta(sb[i]);
+  }
+  sb_free(sb);
+}
+
+size_t parse_meta(const char *src, OoError *err, AsgMeta *data) {
+  Token t = tokenize(src);
+  err->tag = ERR_NONE;
+  data->src = src + (t.len - t.token_len);
+  size_t l = t.len;
+  if (t.tt != ID) {
+    err->tag = ERR_META;
+    err->tt = t.tt;
+    return l;
+  }
+  data->name = src + (t.len - t.token_len);
+  data->name_len = t.token_len;
+
+  t = tokenize(src + l);
+  switch (t.tt) {
+    case EQ:
+      l += t.len;
+      l += parse_literal(src + l, err, &data->unary);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_META;
+        return l;
+      }
+
+      data->tag = META_UNARY;
+      data->len = l;
+      return l;
+    case LPAREN:
+      l += t.len;
+
+      data->nested = NULL;
+      AsgMeta *inner = sb_add(data->nested, 1);
+      l += parse_meta(src + l, err, inner);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_META;
+        free_sb_meta(data->nested);
+        return l;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt != COMMA && t.tt != RPAREN) {
+        err->tag = ERR_META;
+        free_sb_meta(data->nested);
+        err->tt = t.tt;
+        return l;
+      } else {
+        while (t.tt == COMMA) {
+          inner = sb_add(data->nested, 1);
+          l += parse_meta(src + l, err, inner);
+          if (err->tag != ERR_NONE) {
+            free_sb_meta(data->nested);
+            return l;
+          }
+
+          t = tokenize(src + l);
+          l += t.len;
+        }
+        if (t.tt != RPAREN) {
+          err->tag = ERR_EXP;
+          free_sb_meta(data->nested);
+          err->tt = t.tt;
+          return l;
+        }
+
+        data->tag = META_NESTED;
+        data->len = l;
+        return l;
+      }
+    default:
+      data->tag = META_NULLARY;
+      data->len = l;
+      return l;
+  }
+}
+
+void free_inner_meta(AsgMeta data) {
+  switch (data.tag) {
+    case META_NESTED:
+      free_sb_meta(data.nested);
+      break;
+    default:
+      return;
+  }
+}
+
+size_t parse_attr(const char *src, OoError *err, AsgMeta *data) {
+  Token t = tokenize(src);
+  err->tag = ERR_NONE;
+  data->src = src + (t.len - t.token_len);
+  size_t l = t.len;
+
+  if (t.tt != BEGIN_ATTRIBUTE) {
+    err->tag = ERR_ATTR;
+    err->tt = t.tt;
+    return l;
+  }
+
+  l += parse_meta(src + l, err, data);
+  if (err->tag != ERR_NONE) {
+    err->tag = ERR_ATTR;
+    return l;
+  }
+
+  t = tokenize(src + l);
+  l += t.len;
+  if (t.tt != RBRACKET) {
+    err->tag = ERR_ATTR;
+    err->tt = t.tt;
+    return l;
+  }
+
+  data->len = l;
+  return l;
+}
+
+size_t parse_attrs(const char *src, OoError *err, AsgMeta **attrs /* ptr to sb */) {
+  size_t l = 0;
+  Token t = tokenize(src + l);
+  while (t.tt == BEGIN_ATTRIBUTE) {
+    AsgMeta *attr = sb_add(*attrs, 1);
+    l += parse_attr(src + l, err, attr);
+    if (err->tag != ERR_NONE) {
+      return l;
+    }
+    t = tokenize(src + l);
+  }
+  return l;
+}
+
 void free_sb_exps(AsgExp *sb) {
   int i;
   int count = sb_count(sb);
@@ -1476,6 +1623,97 @@ void free_sb_exps(AsgExp *sb) {
     free_inner_exp(sb[i]);
   }
   sb_free(sb);
+}
+
+size_t parse_block(const char *src, OoError *err, AsgBlock *data) {
+  Token t = tokenize(src);
+  err->tag = ERR_NONE;
+  data->src = src + (t.len - t.token_len);
+  size_t l = t.len;
+
+  if (t.tt != LBRACE) {
+    err->tag = ERR_BLOCK;
+    err->tt = t.tt;
+    return l;
+  }
+
+  AsgExp *exps = NULL;
+  AsgMeta **all_attrs = NULL; // sb of sbs
+
+  t = tokenize(src + l);
+
+  if (t.tt == RBRACE) {
+    l += t.len;
+    data->len = l;
+    data->exps = exps;
+    data->attrs = all_attrs;
+    return l;
+  }
+
+  AsgMeta **attrs = sb_add(all_attrs, 1); // ptr to an sb
+  *attrs = NULL;
+
+  l += parse_attrs(src + l, err, attrs);
+  if (err->tag != ERR_NONE) {
+    err->tag = ERR_BLOCK;
+    free_sb_exps(exps);
+    free_sb_sb_meta(all_attrs);
+    return l;
+  }
+
+  AsgExp *exp = sb_add(exps, 1);
+  l += parse_exp(src + l, err, exp);
+  if (err->tag != ERR_NONE) {
+    err->tag = ERR_BLOCK;
+    free_sb_exps(exps);
+    free_sb_sb_meta(all_attrs);
+    return l;
+  }
+
+  t = tokenize(src + l);
+  l += t.len;
+
+  while (t.tt == SEMI) {
+    AsgMeta **attrs = sb_add(all_attrs, 1); // ptr to an sb
+    *attrs = NULL;
+    l += parse_attrs(src + l, err, attrs);
+    if (err->tag != ERR_NONE) {
+      err->tag = ERR_BLOCK;
+      free_sb_exps(exps);
+      free_sb_sb_meta(all_attrs);
+      return l;
+    }
+
+    AsgExp *exp = sb_add(exps, 1);
+    l += parse_exp(src + l, err, exp);
+    if (err->tag != ERR_NONE) {
+      err->tag = ERR_BLOCK;
+      free_sb_exps(exps);
+      free_sb_sb_meta(all_attrs);
+      return l;
+    }
+
+    t = tokenize(src + l);
+    l += t.len;
+  }
+
+
+  if (t.tt == RBRACE) {
+    data->len = l;
+    data->exps = exps;
+    data->attrs = all_attrs;
+    return l;
+  } else {
+    err->tag = ERR_BLOCK;
+    free_sb_exps(exps);
+    free_sb_sb_meta(all_attrs);
+    return l;
+  }
+}
+
+void free_inner_block(AsgBlock data) {
+  free_sb_exps(data.exps);
+  free_sb_sb_meta(data.attrs);
 }
 
 size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data) {
@@ -1529,6 +1767,14 @@ size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data)
       data->tag = EXP_REF_MUT;
       data->len = l;
       data->ref_mut = inner_ref_mut;
+      return l;
+    case LBRACE:
+      l += parse_block(src + l, err, &data->block);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_EXP;
+      }
+      data->tag = EXP_BLOCK;
+      data->len = l;
       return l;
     case LBRACKET:
       l += t.len;
@@ -1736,6 +1982,35 @@ size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data)
       data->len = l;
       data->exp_negate = inner_negate;
       return l;
+    case VAL:
+      l += t.len;
+      l += parse_pattern(src + l, err, &data->val);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_EXP;
+        return l;
+      }
+
+      t = tokenize(src + l);
+      if (t.tt == EQ) {
+        // ExpValAssign
+        l += t.len;
+        AsgExp *rhs = malloc(sizeof(AsgExp));
+        l += parse_exp(src + l, err, rhs);
+        if (err->tag != ERR_NONE) {
+          free(rhs);
+          return l;
+        }
+        data->tag = EXP_VAL_ASSIGN;
+        data->len = l;
+        memmove(&data->val_assign.lhs, &data->val, sizeof(AsgPattern));
+        data->val_assign.rhs = rhs;
+        return l;
+      } else {
+        // ExpVal
+        data->tag = EXP_VAL;
+        data->len = l;
+        return l;
+      }
     default:
       // TODO remove this
       return l;
@@ -1795,6 +2070,17 @@ void free_inner_exp(AsgExp data) {
     case EXP_NEGATE:
       free_inner_exp(*data.exp_negate);
       free(data.exp_negate);
+      break;
+    case EXP_VAL:
+      free_inner_pattern(data.val);
+      break;
+    case EXP_VAL_ASSIGN:
+      free_inner_pattern(data.val_assign.lhs);
+      free_inner_exp(*data.val_assign.rhs);
+      free(data.val_assign.rhs);
+      break;
+    case EXP_BLOCK:
+      free_inner_block(data.block);
       break;
     default:
       return;
