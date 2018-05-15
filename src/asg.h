@@ -49,7 +49,7 @@ typedef struct AsgSid {
 typedef struct AsgId {
   const char *src;
   size_t len;
-  AsgSid *sids;
+  AsgSid *sids; // stretchy buffer
 } AsgId;
 
 typedef struct AsgMacroInv {
@@ -407,7 +407,7 @@ typedef struct AsgExpProductNamed {
 
 typedef struct AsgExpProductAccessAnon {
   AsgExp *inner;
-  long field;
+  unsigned long field;
 } AsgExpProductAccessAnon;
 
 typedef struct AsgExpProductAccessNamed {
@@ -417,15 +417,13 @@ typedef struct AsgExpProductAccessNamed {
 
 typedef struct AsgExpFunAppAnon {
   AsgExp *fun;
-  AsgExp *args;
-  size_t args_len;
+  AsgExp *args; // stretchy buffer
 } AsgExpFunAppAnon;
 
 typedef struct AsgExpFunAppNamed {
   AsgExp *fun;
-  AsgExp *args;
-  AsgSid *names; // same length as args
-  size_t args_len;
+  AsgExp *args; // stretchy buffer
+  AsgSid *sids; // stretchy buffer,  same length as args
 } AsgExpFunAppNamed;
 
 typedef struct AsgExpTypeAppAnon {

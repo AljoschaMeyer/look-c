@@ -983,6 +983,128 @@ void test_exp(void) {
   assert(data.exp_label.src == src + 6);
   assert(data.exp_label.len == 1);
   free_inner_exp(data);
+
+  src = "a@";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_DEREF);
+  assert(data.len == strlen(src));
+  assert(data.deref->src == src);
+  assert(data.deref->len == 1);
+  assert(data.deref->tag == EXP_ID);
+  free_inner_exp(data);
+
+  src = "a@@";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_DEREF);
+  assert(data.len == strlen(src));
+  assert(data.deref->src == src);
+  assert(data.deref->len == 2);
+  assert(data.deref->tag == EXP_DEREF);
+  free_inner_exp(data);
+
+  src = "a~";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_DEREF_MUT);
+  assert(data.len == strlen(src));
+  assert(data.deref_mut->src == src);
+  assert(data.deref_mut->len == 1);
+  assert(data.deref_mut->tag == EXP_ID);
+  free_inner_exp(data);
+
+  src = "a[@b]";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_ARRAY_INDEX);
+  assert(data.len == strlen(src));
+  assert(data.array_index.arr->tag == EXP_ID);
+  assert(data.array_index.index->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "a.42";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_PRODUCT_ACCESS_ANON);
+  assert(data.len == strlen(src));
+  assert(data.product_access_anon.inner->tag == EXP_ID);
+  assert(data.product_access_anon.field == 42);
+  free_inner_exp(data);
+
+  src = "a.42foo";
+  assert(parse_exp(src, &err, &data) == 4);
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_PRODUCT_ACCESS_ANON);
+  assert(data.len == 4);
+  assert(data.product_access_anon.inner->tag == EXP_ID);
+  assert(data.product_access_anon.field == 42);
+  free_inner_exp(data);
+
+  src = "a.b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_PRODUCT_ACCESS_NAMED);
+  assert(data.len == strlen(src));
+  assert(data.product_access_named.inner->tag == EXP_ID);
+  assert(data.product_access_named.field.src == src + 2);
+  free_inner_exp(data);
+
+  src = "a()";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_FUN_APP_ANON);
+  assert(data.len == strlen(src));
+  assert(data.fun_app_anon.fun->tag == EXP_ID);
+  assert(sb_count(data.fun_app_anon.args) == 0);
+  free_inner_exp(data);
+
+  src = "a(@42)";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_FUN_APP_ANON);
+  assert(data.len == strlen(src));
+  assert(data.fun_app_anon.fun->tag == EXP_ID);
+  assert(sb_count(data.fun_app_anon.args) == 1);
+  free_inner_exp(data);
+
+  src = "a(b, @42)";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_FUN_APP_ANON);
+  assert(data.len == strlen(src));
+  assert(data.fun_app_anon.fun->tag == EXP_ID);
+  assert(sb_count(data.fun_app_anon.args) == 2);
+  free_inner_exp(data);
+
+  src = "a(b = @42)";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_FUN_APP_NAMED);
+  assert(data.len == strlen(src));
+  assert(data.fun_app_named.fun->tag == EXP_ID);
+  assert(sb_count(data.fun_app_named.args) == 1);
+  assert(sb_count(data.fun_app_named.sids) == 1);
+  free_inner_exp(data);
+
+  src = "a(b = c, d = e)";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_FUN_APP_NAMED);
+  assert(data.len == strlen(src));
+  assert(data.fun_app_named.fun->tag == EXP_ID);
+  assert(sb_count(data.fun_app_named.args) == 2);
+  assert(sb_count(data.fun_app_named.sids) == 2);
+  free_inner_exp(data);
+
+  src = "(@a) as @b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_CAST);
+  assert(data.len == strlen(src));
+  assert(data.cast.inner->tag == EXP_PRODUCT_ANON);
+  assert(data.cast.type->tag == TYPE_PTR);
+  free_inner_exp(data);
 }
 
 void test_meta(void) {

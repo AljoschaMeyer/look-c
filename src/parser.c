@@ -7,23 +7,15 @@
 #include "asg.h"
 #include "stretchy_buffer.h"
 
-// Consumes a token, but with the generic parsing function signature.
-// TODO delete if this remains unused
-size_t parse_token(const char *src, OoError *err, void *data) {
-  (void)err;
-  *((Token *) data) = tokenize(src);
-  return ((Token *) data)->len;
-}
-
 size_t parse_id(const char *src, OoError *err, AsgId *data) {
   size_t l = 0;
   Token t;
 
   err->tag = ERR_NONE;
   data->sids = NULL;
-  sb_add(data->sids, 1);
+  AsgSid *sid = sb_add(data->sids, 1);
 
-  l += parse_sid(src, err, &sb_last(data->sids));
+  l += parse_sid(src, err, sid);
   if (err->tag != ERR_NONE) {
     sb_free(data->sids);
     return l;
@@ -32,8 +24,8 @@ size_t parse_id(const char *src, OoError *err, AsgId *data) {
   t = tokenize(src + l);
   l += t.len;
   while (t.tt == SCOPE) {
-    sb_add(data->sids, 1);
-    l += parse_sid(src + l, err, &sb_last(data->sids));
+    sid = sb_add(data->sids, 1);
+    l += parse_sid(src + l, err, sid);
     if (err->tag != ERR_NONE) {
       sb_free(data->sids);
       return l;
@@ -2254,10 +2246,260 @@ size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data)
 }
 
 size_t parse_exp(const char *src, OoError *err, AsgExp *data) {
-  return parse_exp_non_left_recursive(src, err, data);
-  // deref, deref_mut, array_index, product_access_anon, product_access_named,
-  // fun_app_anon, fun_app_named, type_app_anon, type_app_named, cast, bin_op,
-  // assign
+  size_t l = parse_exp_non_left_recursive(src, err, data);
+  Token t = tokenize(src + l);
+
+  while (true) {
+    switch (t.tt) {
+      case AT:
+        l += t.len;
+        AsgExp *l_deref = malloc(sizeof(AsgExp));
+        memcpy(l_deref, data, sizeof(AsgExp));
+        data->tag = EXP_DEREF;
+        data->src = l_deref->src;
+        data->len = l_deref->len + t.len;
+        data->deref = l_deref;
+        t = tokenize(src + l);
+        break;
+      case TILDE:
+        l += t.len;
+        AsgExp *l_deref_mut = malloc(sizeof(AsgExp));
+        memcpy(l_deref_mut, data, sizeof(AsgExp));
+        data->tag = EXP_DEREF_MUT;
+        data->src = l_deref_mut->src;
+        data->len = l_deref_mut->len + t.len;
+        data->deref_mut = l_deref_mut;
+        t = tokenize(src + l);
+        break;
+      case LBRACKET:
+        l += t.len;
+
+        AsgExp *array_index = malloc(sizeof(AsgExp));
+        l += parse_exp(src + l, err, array_index);
+        if (err->tag != ERR_NONE) {
+          free(array_index);
+          return l;
+        }
+
+        t = tokenize(src + l);
+        l += t.len;
+        if (t.tt != RBRACKET) {
+          err->tag = ERR_EXP;
+          err->tt = t.tt;
+          free(array_index);
+          free_inner_exp(*data);
+          return l;
+        }
+
+        AsgExp *l_arr = malloc(sizeof(AsgExp));
+        memcpy(l_arr, data, sizeof(AsgExp));
+        data->tag = EXP_ARRAY_INDEX;
+        data->src = l_arr->src;
+        data->len = l;
+        data->array_index.arr = l_arr;
+        data->array_index.index = array_index;
+        t = tokenize(src + l);
+        break;
+      case DOT:
+        l += t.len;
+
+        t = tokenize(src + l);
+        switch (t.tt) {
+          case INT:
+            ;
+            unsigned long field = strtoul(src + l, NULL, 10);
+            l += t.len;
+
+            AsgExp *l_product_access_anon = malloc(sizeof(AsgExp));
+            memcpy(l_product_access_anon, data, sizeof(AsgExp));
+            data->tag = EXP_PRODUCT_ACCESS_ANON;
+            data->src = l_product_access_anon->src;
+            data->len = l;
+            data->product_access_anon.inner = l_product_access_anon;
+            data->product_access_anon.field = field;
+            t = tokenize(src + l);
+            break;
+          case ID:
+            ;
+            AsgExp *l_product_access_named = malloc(sizeof(AsgExp));
+            memcpy(l_product_access_named, data, sizeof(AsgExp));
+            l += parse_sid(src + l, err, &data->product_access_named.field);
+            data->tag = EXP_PRODUCT_ACCESS_NAMED;
+            data->src = l_product_access_named->src;
+            data->len = l;
+            data->product_access_named.inner = l_product_access_named;
+            t = tokenize(src + l);
+            break;
+          default:
+            l += t.len;
+            free_inner_exp(*data);
+            err->tag = ERR_EXP;
+            err->tt = t.tt;
+            return l;
+        }
+        break;
+      case LPAREN:
+        // handles empty fun application, anon fun application, named fun application
+        l += t.len;
+        t = tokenize(src + l);
+
+        AsgExp *l_fun_app = malloc(sizeof(AsgExp));
+        memcpy(l_fun_app, data, sizeof(AsgExp));
+
+        if (t.tt == RPAREN) {
+          // empty (anon) fun application
+          l += t.len;
+
+          data->tag = EXP_FUN_APP_ANON;
+          data->src = l_fun_app->src;
+          data->len = l;
+          data->fun_app_anon.fun = l_fun_app;
+          data->fun_app_anon.args = NULL;
+          t = tokenize(src + l);
+          break;
+        } else if (t.tt == ID) {
+          // named fun app iff the next token is EQ
+          Token t2 = tokenize(src + l + t.len);
+          if (t2.tt == EQ) {
+            // named fun app
+            AsgSid *sids = NULL;
+            AsgExp *inners = NULL;
+
+            AsgSid *sid = sb_add(sids, 1);
+            l += parse_sid(src + l, err, sid);
+            l += t2.len;
+            AsgExp *inner;
+            inner = sb_add(inners, 1);
+            l += parse_exp(src + l, err, inner);
+            if (err->tag != ERR_NONE) {
+              sb_free(sids);
+              free_sb_exps(inners);
+              free(l_fun_app);
+              return l;
+            }
+            t = tokenize(src + l);
+            l += t.len;
+
+            while (t.tt == COMMA) {
+              sid = sb_add(sids, 1);
+              l += parse_sid(src + l, err, sid);
+              if (err->tag != ERR_NONE) {
+                sb_free(sids);
+                free_sb_exps(inners);
+                free(l_fun_app);
+                err->tag = ERR_EXP;
+                return l;
+              }
+
+              t = tokenize(src + l);
+              l += t.len;
+              if (t.tt != EQ) {
+                sb_free(sids);
+                free_sb_exps(inners);
+                free(l_fun_app);
+                err->tag = ERR_EXP;
+                err->tt = t.tt;
+                return l;
+              }
+
+              inner = sb_add(inners, 1);
+              l += parse_exp(src + l, err, inner);
+              if (err->tag != ERR_NONE) {
+                sb_free(sids);
+                free_sb_exps(inners);
+                free(l_fun_app);
+                return l;
+              }
+
+              t = tokenize(src + l);
+              l += t.len;
+            }
+
+            data->tag = EXP_FUN_APP_NAMED;
+            data->src = l_fun_app->src;
+            data->len = l;
+            data->fun_app_named.fun = l_fun_app;
+            data->fun_app_named.args = inners;
+            data->fun_app_named.sids = sids;
+            t = tokenize(src + l);
+            break;
+          }
+        }
+        // anon fun app
+        AsgExp *inners = NULL;
+        AsgExp *inner = sb_add(inners, 1);
+        l += parse_exp(src + l, err, inner);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_EXP;
+          free_sb_exps(inners);
+          free(l_fun_app);
+          return l;
+        }
+
+        t = tokenize(src + l);
+        l += t.len;
+        if (t.tt != COMMA && t.tt != RPAREN) {
+          err->tag = ERR_EXP;
+          free_sb_exps(inners);
+          free(l_fun_app);
+          err->tt = t.tt;
+          return l;
+        } else {
+          while (t.tt == COMMA) {
+            inner = sb_add(inners, 1);
+            l += parse_exp(src + l, err, inner);
+            if (err->tag != ERR_NONE) {
+              free_sb_exps(inners);
+              free(l_fun_app);
+              return l;
+            }
+
+            t = tokenize(src + l);
+            l += t.len;
+          }
+          if (t.tt != RPAREN) {
+            err->tag = ERR_EXP;
+            free_sb_exps(inners);
+            free(l_fun_app);
+            err->tt = t.tt;
+            return l;
+          }
+
+          data->tag = EXP_FUN_APP_ANON;
+          data->src = l_fun_app->src;
+          data->len = l;
+          data->fun_app_anon.fun = l_fun_app;
+          data->fun_app_anon.args = inners;
+          t = tokenize(src + l);
+          break;
+        }
+      case AS:
+        l += t.len;
+
+        AsgType *cast_type = malloc(sizeof(AsgType));
+        l += parse_type(src + l, err, cast_type);
+        if (err->tag != ERR_NONE) {
+          free(cast_type);
+          err->tag = ERR_EXP;
+          return l;
+        }
+
+        AsgExp *l_cast = malloc(sizeof(AsgExp));
+        memcpy(l_cast, data, sizeof(AsgExp));
+        data->tag = EXP_CAST;
+        data->src = l_cast->src;
+        data->len = l;
+        data->cast.inner = l_cast;
+        data->cast.type = cast_type;
+        t = tokenize(src + l);
+        break;
+      default:
+        return l;
+    }
+  }
+
+
+  // bin_op, assign
 
   // TODO parse left-recursive expressions
 }
@@ -2348,6 +2590,45 @@ void free_inner_exp(AsgExp data) {
     case EXP_BREAK:
       free_inner_exp(*data.exp_break);
       free(data.exp_break);
+      break;
+    case EXP_DEREF:
+      free_inner_exp(*data.deref);
+      free(data.deref);
+      break;
+    case EXP_DEREF_MUT:
+      free_inner_exp(*data.deref_mut);
+      free(data.deref_mut);
+      break;
+    case EXP_ARRAY_INDEX:
+      free_inner_exp(*data.array_index.arr);
+      free(data.array_index.arr);
+      free_inner_exp(*data.array_index.index);
+      free(data.array_index.index);
+      break;
+    case EXP_PRODUCT_ACCESS_ANON:
+      free_inner_exp(*data.product_access_anon.inner);
+      free(data.product_access_anon.inner);
+      break;
+    case EXP_PRODUCT_ACCESS_NAMED:
+      free_inner_exp(*data.product_access_named.inner);
+      free(data.product_access_named.inner);
+      break;
+    case EXP_FUN_APP_ANON:
+      free_inner_exp(*data.fun_app_anon.fun);
+      free(data.fun_app_anon.fun);
+      free_sb_exps(data.fun_app_anon.args);
+      break;
+    case EXP_FUN_APP_NAMED:
+      free_inner_exp(*data.fun_app_named.fun);
+      free(data.fun_app_named.fun);
+      free_sb_exps(data.fun_app_named.args);
+      sb_free(data.fun_app_named.sids);
+      break;
+    case EXP_CAST:
+      free_inner_exp(*data.cast.inner);
+      free(data.cast.inner);
+      free_inner_type(*data.cast.type);
+      free(data.cast.type);
       break;
     default:
       return;
