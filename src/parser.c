@@ -210,6 +210,87 @@ size_t parse_bin_op(const char *src, OoError *err, AsgBinOp *op) {
   }
 }
 
+size_t parse_assign_op(const char *src, OoError *err, AsgAssignOp *op) {
+  size_t l;
+  err->tag = ERR_NONE;
+  Token t = tokenize(src);
+  l = t.len;
+
+  switch (t.tt) {
+    case EQ:
+      *op = ASSIGN_REGULAR;
+      return l;
+    case PLUS_ASSIGN:
+      *op = ASSIGN_PLUS;
+      return l;
+    case MINUS_ASSIGN:
+      *op = ASSIGN_MINUS;
+      return l;
+    case TIMES_ASSIGN:
+      *op = ASSIGN_TIMES;
+      return l;
+    case DIV_ASSIGN:
+      *op = ASSIGN_TIMES;
+      return l;
+    case MOD_ASSIGN:
+      *op = ASSIGN_MOD;
+      return l;
+    case XOR_ASSIGN:
+      *op = ASSIGN_XOR;
+      return l;
+    case AND_ASSIGN:
+      *op = ASSIGN_AND;
+      return l;
+    case OR_ASSIGN:
+      *op = ASSIGN_OR;
+      return l;
+    case LANGLE:
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt != LANGLE) {
+        err->tag = ERR_ASSIGN_OP;
+        err->tt = t.tt;
+        return t.len;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+
+      if (t.tt == EQ) {
+        *op = ASSIGN_SHIFT_L;
+        return l;
+      } else {
+        err->tag = ERR_ASSIGN_OP;
+        err->tt = t.tt;
+        return t.len;
+      }
+    case RANGLE:
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt != RANGLE) {
+        err->tag = ERR_ASSIGN_OP;
+        err->tt = t.tt;
+        return t.len;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+
+      if (t.tt == EQ) {
+        *op = ASSIGN_SHIFT_R;
+        return l;
+      } else {
+        err->tag = ERR_ASSIGN_OP;
+        err->tt = t.tt;
+        return t.len;
+      }
+    default:
+      err->tag = ERR_ASSIGN_OP;
+      err->tt = t.tt;
+      return t.len;
+  }
+}
+
 size_t parse_size_of(const char *src, OoError *err, AsgType *data) {
   err->tag = ERR_NONE;
   size_t l;
@@ -2493,15 +2574,135 @@ size_t parse_exp(const char *src, OoError *err, AsgExp *data) {
         data->cast.type = cast_type;
         t = tokenize(src + l);
         break;
+      case PLUS:
+      case MINUS:
+      case TIMES:
+      case DIV:
+      case MOD:
+      case PIPE:
+      case AMPERSAND:
+      case XOR:
+      case LAND:
+      case LOR:
+      case EQUALS:
+      case NOTEQUALS:
+        ;
+        AsgBinOp bin_op;
+        l += parse_bin_op(src + l, err, &bin_op);
+        if (err->tag != ERR_NONE) {
+          if (err->tag != ERR_NONE) {
+            err->tag = ERR_EXP;
+            return l;
+          }
+        }
+
+        AsgExp *bin_op_rhs = malloc(sizeof(AsgExp));
+        l += parse_exp(src + l, err, bin_op_rhs);
+        if (err->tag != ERR_NONE) {
+          free(bin_op_rhs);
+          return l;
+        }
+
+        AsgExp *l_bin_op = malloc(sizeof(AsgExp));
+        memcpy(l_bin_op, data, sizeof(AsgExp));
+        data->tag = EXP_BIN_OP;
+        data->src = l_bin_op->src;
+        data->len = l;
+        data->bin_op.op = bin_op;
+        data->bin_op.lhs = l_bin_op;
+        data->bin_op.rhs = bin_op_rhs;
+        t = tokenize(src + l);
+        break;
+      case PLUS_ASSIGN:
+      case MINUS_ASSIGN:
+      case TIMES_ASSIGN:
+      case DIV_ASSIGN:
+      case MOD_ASSIGN:
+      case XOR_ASSIGN:
+      case AND_ASSIGN:
+      case OR_ASSIGN:
+      case EQ:
+        ;
+        AsgAssignOp op;
+        l += parse_assign_op(src + l, err, &op);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_EXP;
+          return l;
+        }
+
+        AsgExp *assign_rhs = malloc(sizeof(AsgExp));
+        l += parse_exp(src + l, err, assign_rhs);
+        if (err->tag != ERR_NONE) {
+          free(assign_rhs);
+          return l;
+        }
+
+        AsgExp *l_assign = malloc(sizeof(AsgExp));
+        memcpy(l_assign, data, sizeof(AsgExp));
+        data->tag = EXP_ASSIGN;
+        data->src = l_assign->src;
+        data->len = l;
+        data->assign.op = op;
+        data->assign.lhs = l_assign;
+        data->assign.rhs = assign_rhs;
+        t = tokenize(src + l);
+        break;
+      case LANGLE:
+      case RANGLE:
+        ;
+        AsgAssignOp foo_assign_op;
+        size_t assign_len = parse_assign_op(src + l, err, &foo_assign_op);
+        if (err->tag != ERR_NONE) {
+          AsgBinOp bin_op;
+          l += parse_bin_op(src + l, err, &bin_op);
+          if (err->tag != ERR_NONE) {
+            if (err->tag != ERR_NONE) {
+              err->tag = ERR_EXP;
+              return l;
+            }
+          }
+
+          AsgExp *bin_op_rhs = malloc(sizeof(AsgExp));
+          l += parse_exp(src + l, err, bin_op_rhs);
+          if (err->tag != ERR_NONE) {
+            free(bin_op_rhs);
+            return l;
+          }
+
+          AsgExp *l_bin_op = malloc(sizeof(AsgExp));
+          memcpy(l_bin_op, data, sizeof(AsgExp));
+          data->tag = EXP_BIN_OP;
+          data->src = l_bin_op->src;
+          data->len = l;
+          data->bin_op.op = bin_op;
+          data->bin_op.lhs = l_bin_op;
+          data->bin_op.rhs = bin_op_rhs;
+          t = tokenize(src + l);
+          break;
+        }
+        l += assign_len;
+
+        AsgExp *foo_assign_rhs = malloc(sizeof(AsgExp));
+        l += parse_exp(src + l, err, foo_assign_rhs);
+        if (err->tag != ERR_NONE) {
+          free(foo_assign_rhs);
+          return l;
+        }
+
+        AsgExp *foo_l_assign = malloc(sizeof(AsgExp));
+        memcpy(foo_l_assign, data, sizeof(AsgExp));
+        data->tag = EXP_ASSIGN;
+        data->src = foo_l_assign->src;
+        data->len = l;
+        data->assign.op = foo_assign_op;
+        data->assign.lhs = foo_l_assign;
+        data->assign.rhs = foo_assign_rhs;
+        t = tokenize(src + l);
+        break;
       default:
         return l;
     }
   }
-
-
-  // bin_op, assign
-
-  // TODO parse left-recursive expressions
 }
 
 void free_inner_exp(AsgExp data) {
@@ -2629,6 +2830,18 @@ void free_inner_exp(AsgExp data) {
       free(data.cast.inner);
       free_inner_type(*data.cast.type);
       free(data.cast.type);
+      break;
+    case EXP_BIN_OP:
+      free_inner_exp(*data.bin_op.lhs);
+      free(data.bin_op.lhs);
+      free_inner_exp(*data.bin_op.rhs);
+      free(data.bin_op.rhs);
+      break;
+    case EXP_ASSIGN:
+      free_inner_exp(*data.assign.lhs);
+      free(data.assign.lhs);
+      free_inner_exp(*data.assign.rhs);
+      free(data.assign.rhs);
       break;
     default:
       return;

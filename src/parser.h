@@ -14,6 +14,7 @@ typedef enum {
   ERR_LITERAL,
   ERR_REPEAT,
   ERR_BIN_OP,
+  ERR_ASSIGN_OP,
   ERR_TYPE,
   ERR_SUMMAND,
   ERR_PATTERN,

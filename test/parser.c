@@ -1105,6 +1105,66 @@ void test_exp(void) {
   assert(data.cast.inner->tag == EXP_PRODUCT_ANON);
   assert(data.cast.type->tag == TYPE_PTR);
   free_inner_exp(data);
+
+  src = "(@a) + @b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BIN_OP);
+  assert(data.len == strlen(src));
+  assert(data.bin_op.op == OP_PLUS);
+  assert(data.bin_op.lhs->tag == EXP_PRODUCT_ANON);
+  assert(data.bin_op.rhs->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "(@a) < @b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BIN_OP);
+  assert(data.len == strlen(src));
+  assert(data.bin_op.op == OP_LT);
+  assert(data.bin_op.lhs->tag == EXP_PRODUCT_ANON);
+  assert(data.bin_op.rhs->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "(@a) << @b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BIN_OP);
+  assert(data.len == strlen(src));
+  assert(data.bin_op.op == OP_SHIFT_L);
+  assert(data.bin_op.lhs->tag == EXP_PRODUCT_ANON);
+  assert(data.bin_op.rhs->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "(@a) += @b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_ASSIGN);
+  assert(data.len == strlen(src));
+  assert(data.assign.op == ASSIGN_PLUS);
+  assert(data.assign.lhs->tag == EXP_PRODUCT_ANON);
+  assert(data.assign.rhs->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "(@a) <<= @b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_ASSIGN);
+  assert(data.len == strlen(src));
+  assert(data.assign.op == ASSIGN_SHIFT_L);
+  assert(data.assign.lhs->tag == EXP_PRODUCT_ANON);
+  assert(data.assign.rhs->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = "(@a) = @b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_ASSIGN);
+  assert(data.len == strlen(src));
+  assert(data.assign.op == ASSIGN_REGULAR);
+  assert(data.assign.lhs->tag == EXP_PRODUCT_ANON);
+  assert(data.assign.rhs->tag == EXP_REF);
+  free_inner_exp(data);
 }
 
 void test_meta(void) {
