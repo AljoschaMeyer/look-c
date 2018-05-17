@@ -319,8 +319,6 @@ Token tokenize(const char *src) {
             tt = KW_MOD;
           } else if (strncmp(src + token_start, "super", 5) == 0) {
             tt = SUPER;
-          } else if (strncmp(src + token_start, "self", 4) == 0) {
-            tt = SELF;
           } else if (strncmp(src + token_start, "dep", 3) == 0) {
             tt = DEP;
           } else if (strncmp(src + token_start, "magic", 5) == 0) {

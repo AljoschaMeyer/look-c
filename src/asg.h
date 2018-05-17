@@ -21,6 +21,7 @@ typedef struct AsgRepeat AsgRepeat;
 typedef struct AsgLValue AsgLValue;
 typedef struct AsgPattern AsgPattern;
 typedef struct AsgBlock AsgBlock;
+typedef struct AsgUseTree AsgUseTree;
 
 typedef enum {
   BINDING_NONE, // the sid does not resolve to a binding (because it defines one)
@@ -165,29 +166,14 @@ typedef enum {
   USE_TREE_BRANCH
 } TagUseTree;
 
-typedef struct AsgUseTreeRename {
-  const char *src;
-  size_t len;
-  AsgSid sid;
-  AsgSid new_sid;
-} AsgUseTreeRename;
-
-typedef struct AsgUseTreeBranch {
-  const char *src;
-  size_t len;
-  AsgSid sid;
-  AsgSid *children;
-  size_t children_len;
-} AsgUseTreeBranch;
-
 typedef struct AsgUseTree {
   const char *src;
   size_t len;
   TagUseTree tag;
+  AsgSid sid;
   union {
-    AsgSid leaf;
-    AsgUseTreeRename rename;
-    AsgUseTreeBranch branch;
+    AsgSid rename;
+    AsgUseTree* branch; // stretchy buffer
   };
 } AsgUseTree;
 

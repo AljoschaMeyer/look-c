@@ -1212,6 +1212,63 @@ void test_meta(void) {
   free_inner_meta(data);
 }
 
+void test_use_tree(void) {
+  char *src = "a";
+  OoError err;
+  AsgUseTree data;
+
+  assert(parse_use_tree(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == USE_TREE_LEAF);
+  assert(data.sid.len == 1);
+  free_inner_use_tree(data);
+
+  src = "a as b";
+  assert(parse_use_tree(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == USE_TREE_RENAME);
+  assert(data.sid.len == 1);
+  assert(data.rename.len == 1);
+  free_inner_use_tree(data);
+
+  src = "a::b::c";
+  assert(parse_use_tree(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == USE_TREE_BRANCH);
+  assert(data.sid.len == 1);
+  assert(sb_count(data.branch) == 1);
+  assert(data.branch[0].tag == USE_TREE_BRANCH);
+  assert(sb_count(data.branch[0].branch) == 1);
+  assert(data.branch[0].branch[0].tag == USE_TREE_LEAF);
+  free_inner_use_tree(data);
+
+  src = "a::{a}";
+  assert(parse_use_tree(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == USE_TREE_BRANCH);
+  assert(data.sid.len == 1);
+  assert(sb_count(data.branch) == 1);
+  assert(data.branch[0].tag == USE_TREE_LEAF);
+  free_inner_use_tree(data);
+
+  src = "super::{dep, magic, mod}";
+  src = "super::{dep, magic, mod}";
+  assert(parse_use_tree(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == USE_TREE_BRANCH);
+  assert(data.sid.len == 5);
+  assert(sb_count(data.branch) == 3);
+  assert(data.branch[0].tag == USE_TREE_LEAF);
+  assert(data.branch[1].tag == USE_TREE_LEAF);
+  assert(data.branch[2].tag == USE_TREE_LEAF);
+  free_inner_use_tree(data);
+}
+
 int main(void) {
   test_sid();
   test_id();
@@ -1222,6 +1279,7 @@ int main(void) {
   test_pattern();
   test_exp();
   test_meta();
+  test_use_tree();
 
   return 0;
 }

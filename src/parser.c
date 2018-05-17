@@ -2847,3 +2847,132 @@ void free_inner_exp(AsgExp data) {
       return;
   }
 }
+
+void free_sb_use_tree(AsgUseTree *sb) {
+  int i;
+  int count = sb_count(sb);
+  for (i = 0; i < count; i++) {
+    free_inner_use_tree(sb[i]);
+  }
+  sb_free(sb);
+}
+
+size_t parse_sid_or_use_kw(const char *src, OoError *err, AsgSid *data) {
+  Token t = tokenize(src);
+
+  if (t.tt != ID && t.tt != SUPER && t.tt != DEP && t.tt != MAGIC && t.tt != KW_MOD) {
+    err->tag = ERR_SID;
+    err->tt = t.tt;
+    return t.len;
+  } else {
+    err->tag = ERR_NONE;
+  }
+
+  data->src = src + (t.len - t.token_len);
+  data->len = t.token_len;
+
+  return t.len;
+}
+
+size_t parse_use_tree(const char *src, OoError *err, AsgUseTree *data) {
+  Token t;
+  err->tag = ERR_NONE;
+  data->src = src;
+  size_t l = 0;
+
+  l += parse_sid_or_use_kw(src, err, &data->sid);
+  if (err->tag != ERR_NONE) {
+    err->tag = ERR_USE_TREE;
+    return l;
+  }
+
+  t = tokenize(src + l);
+  if (t.tt == AS) {
+    l += t.len;
+    l += parse_sid(src + l, err, &data->rename);
+    if (err->tag != ERR_NONE) {
+      err->tag = ERR_USE_TREE;
+      return l;
+    }
+
+    data->len = l;
+    data->tag = USE_TREE_RENAME;
+    return l;
+  } else if (t.tt == SCOPE) {
+    l += t.len;
+    t = tokenize(src + l);
+    if (t.tt == ID || t.tt == SUPER || t.tt == DEP || t.tt == MAGIC || t.tt == KW_MOD) {
+      AsgUseTree *inners = NULL;
+      AsgUseTree *inner = sb_add(inners, 1);
+      l += parse_use_tree(src + l, err, inner);
+      if (err->tag != ERR_NONE) {
+        free_sb_use_tree(inners);
+        return l;
+      }
+      data->len = l;
+      data->tag = USE_TREE_BRANCH;
+      data->branch = inners;
+      return l;
+    } else if (t.tt == LBRACE) {
+      l += t.len;
+
+      AsgUseTree *inners = NULL;
+      AsgUseTree *inner = sb_add(inners, 1);
+      l += parse_use_tree(src + l, err, inner);
+      if (err->tag != ERR_NONE) {
+        free_sb_use_tree(inners);
+        return l;
+      }
+
+      t = tokenize(src + l);
+      l += t.len;
+      if (t.tt != COMMA && t.tt != RBRACE) {
+        err->tag = ERR_USE_TREE;
+        free_sb_use_tree(inners);
+        err->tt = t.tt;
+        return l;
+      } else {
+        while (t.tt == COMMA) {
+          inner = sb_add(inners, 1);
+          l += parse_use_tree(src + l, err, inner);
+          if (err->tag != ERR_NONE) {
+            free_sb_use_tree(inners);
+            return l;
+          }
+
+          t = tokenize(src + l);
+          l += t.len;
+        }
+        if (t.tt != RBRACE) {
+          err->tag = ERR_EXP;
+          free_sb_use_tree(inners);
+          err->tt = t.tt;
+          return l;
+        }
+
+        data->len = l;
+        data->tag = USE_TREE_BRANCH;
+        data->branch = inners;
+        return l;
+      }
+    } else {
+      err->tag = ERR_USE_TREE;
+      err->tt = t.tt;
+      return l;
+    }
+  } else {
+    data->len = l;
+    data->tag = USE_TREE_LEAF;
+    return l;
+  }
+}
+
+void free_inner_use_tree(AsgUseTree data) {
+  switch (data.tag) {
+    case USE_TREE_BRANCH:
+      free_sb_use_tree(data.branch);
+      break;
+    default:
+      return;
+  }
+}

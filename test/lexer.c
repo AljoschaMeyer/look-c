@@ -154,6 +154,10 @@ void test_id(void) {
   assert(t.tt == END);
   assert(t.len == 0);
 
+  t = tokenize(" a");
+  assert(t.tt == ID);
+  assert(t.len == 2);
+
   t = tokenize("use");
   assert(t.tt == USE);
   assert(t.len == 3);
@@ -165,10 +169,6 @@ void test_id(void) {
   t = tokenize("super");
   assert(t.tt == SUPER);
   assert(t.len == 5);
-
-  t = tokenize("self");
-  assert(t.tt == SELF);
-  assert(t.len == 4);
 
   t = tokenize("dep");
   assert(t.tt == DEP);
