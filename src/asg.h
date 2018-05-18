@@ -126,9 +126,9 @@ typedef struct AsgRepeat {
 typedef struct AsgFile {
   const char *src;
   size_t len;
-  AsgItem *items;
-  size_t item_len;
-  rax *items_by_id; // stores `AsgItem`s TODO remove this, keep analysis separate?
+  AsgItem *items; // stretchy buffer
+  AsgMeta **attrs; // stretchy buffer of stretchy buffers, same length as items
+  // rax *items_by_id; // stores `AsgItem`s TODO remove this, keep analysis separate?
 } AsgFile;
 
 typedef enum {
@@ -542,7 +542,7 @@ typedef struct AsgItemFun {
 } AsgItemFun;
 
 typedef struct AsgItemFfiInclude {
-  char *include; // e.g. <stdio.h> or "asg.h"
+  const char *include; // e.g. <stdio.h> or "asg.h"
   size_t include_len;
 } AsgItemFfiInclude;
 

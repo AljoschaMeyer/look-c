@@ -1322,20 +1322,20 @@ void test_item(void) {
   assert(data.val.exp.tag == EXP_REF);
   free_inner_item(data);
 
-  // src = "fn a = () {}";
-  // assert(parse_item(src, &err, &data) == strlen(src));
-  // assert(err.tag == ERR_NONE);
-  // assert(data.len == strlen(src));
-  // assert(data.tag == ITEM_FUN);
-  // assert(!data.pub);
-  // assert(data.fun.sid.len == 1);
-  // assert(sb_count(data.fun.type_args) == 0);
-  // assert(sb_count(data.fun.arg_sids) == 0);
-  // assert(sb_count(data.fun.arg_types) == 0);
-  // assert(data.fun.ret.tag = TYPE_PRODUCT_ANON);
-  // assert(sb_count(data.fun.ret.product_anon) == 0);
-  // assert(sb_count(data.fun.body.exps) == 0);
-  // free_inner_item(data);
+  src = "fn a = () {}";
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_FUN);
+  assert(!data.pub);
+  assert(data.fun.sid.len == 1);
+  assert(sb_count(data.fun.type_args) == 0);
+  assert(sb_count(data.fun.arg_sids) == 0);
+  assert(sb_count(data.fun.arg_types) == 0);
+  assert(data.fun.ret.tag = TYPE_PRODUCT_ANON);
+  assert(sb_count(data.fun.ret.product_anon) == 0);
+  assert(sb_count(data.fun.body.exps) == 0);
+  free_inner_item(data);
 
   src = "fn a = <T> => (b: T) -> @c {a}";
   assert(parse_item(src, &err, &data) == strlen(src));
@@ -1364,6 +1364,76 @@ void test_item(void) {
   assert(data.fun.ret.tag = TYPE_PTR);
   assert(sb_count(data.fun.body.exps) == 2);
   free_inner_item(data);
+
+  src = "ffi use(foo.h)";
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_FFI_INCLUDE);
+  assert(!data.pub);
+  assert(data.ffi_include.include == src + 8);
+  assert(data.ffi_include.include_len == 5);
+  free_inner_item(data);
+
+  src = "ffi a: @B";
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_FFI_VAL);
+  assert(!data.pub);
+  assert(!data.ffi_val.mut);
+  assert(data.ffi_val.sid.len == 1);
+  assert(data.ffi_val.type.tag == TYPE_PTR);
+  free_inner_item(data);
+
+  src = "pub ffi mut a: @B";
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_FFI_VAL);
+  assert(data.pub);
+  assert(data.ffi_val.mut);
+  assert(data.ffi_val.sid.len == 1);
+  assert(data.ffi_val.type.tag == TYPE_PTR);
+  free_inner_item(data);
+}
+
+void test_file(void) {
+  char *src = "type a = b";
+  OoError err;
+  AsgFile data;
+
+  assert(parse_file(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.items) == 1);
+  assert(sb_count(data.attrs) == 1);
+  assert(data.items[0].tag == ITEM_TYPE);
+  assert(!data.items[0].pub);
+  free_inner_file(data);
+
+  src = "#[foo]#[bar] type a = b";
+  assert(parse_file(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.items) == 1);
+  assert(sb_count(data.attrs) == 1);
+  assert(data.items[0].tag == ITEM_TYPE);
+  assert(!data.items[0].pub);
+  assert(sb_count(data.attrs[0]) == 2);
+  free_inner_file(data);
+
+  src = "type a = b type c = @d";
+  assert(parse_file(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(sb_count(data.items) == 2);
+  assert(sb_count(data.attrs) == 2);
+  assert(data.items[0].tag == ITEM_TYPE);
+  assert(!data.items[0].pub);
+  assert(data.items[1].tag == ITEM_TYPE);
+  assert(!data.items[1].pub);
+  free_inner_file(data);
 }
 
 int main(void) {
@@ -1378,6 +1448,7 @@ int main(void) {
   test_meta();
   test_use_tree();
   test_item();
+  test_file();
 
   return 0;
 }

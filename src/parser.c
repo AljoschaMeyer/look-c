@@ -2977,6 +2977,15 @@ void free_inner_use_tree(AsgUseTree data) {
   }
 }
 
+void free_sb_items(AsgItem *sb) {
+  int i;
+  int count = sb_count(sb);
+  for (i = 0; i < count; i++) {
+    free_inner_item(sb[i]);
+  }
+  sb_free(sb);
+}
+
 size_t parse_item(const char *src, OoError *err, AsgItem *data) {
   Token t;
   err->tag = ERR_NONE;
@@ -3226,8 +3235,6 @@ size_t parse_item(const char *src, OoError *err, AsgItem *data) {
         data->fun.arg_types = types;
       }
 
-
-
       t = tokenize(src + l);
       if (t.tt == ARROW) {
         l += t.len;
@@ -3259,6 +3266,72 @@ size_t parse_item(const char *src, OoError *err, AsgItem *data) {
       data->tag = ITEM_FUN;
       data->len = l;
       return l;
+    case FFI:
+      t = tokenize(src + l);
+      if (t.tt == USE) {
+        l += t.len;
+
+        t = tokenize(src + l);
+        if (t.tt != LPAREN) {
+          err->tag = ERR_ITEM;
+          err->tt = t.tt;
+          return l;
+        }
+        l += t.len;
+        data->ffi_include.include = src + l;
+        data->ffi_include.include_len = 0;
+
+        t = tokenize(src + l);
+        while (t.tt != RPAREN) {
+          l += t.len;
+          data->ffi_include.include_len += t.len;
+          t = tokenize(src + l); // This does not correctly handle EOF and lexer errors
+
+          if (t.tt == END || token_type_error(t.tt)) {
+            err->tag = ERR_ITEM;
+            err->tt = t.tt;
+            return l;
+          }
+        }
+        l += t.len;
+
+        data->tag = ITEM_FFI_INCLUDE;
+        data->len = l;
+        return l;
+      } else {
+        if (t.tt == MUT) {
+          data->ffi_val.mut = true;
+          l += t.len;
+          t = tokenize(src + l);
+        } else {
+          data->ffi_val.mut = false;
+        }
+
+        l += parse_sid(src + l, err, &data->ffi_val.sid);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_ITEM;
+          return l;
+        }
+
+        t = tokenize(src + l);
+        if (t.tt != COLON) {
+          err->tag = ERR_ITEM;
+          err->tt = t.tt;
+          return l;
+        }
+        l += t.len;
+
+
+        l += parse_type(src + l, err, &data->ffi_val.type);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_ITEM;
+          return l;
+        }
+
+        data->tag = ITEM_FFI_VAL;
+        data->len = l;
+        return l;
+      }
     default:
       err->tag = ERR_ITEM;
       err->tt = t.tt;
@@ -3285,7 +3358,77 @@ void free_inner_item(AsgItem data) {
       free_inner_type(data.fun.ret);
       free_inner_block(data.fun.body);
       break;
-    default:
-      return;
+    case ITEM_FFI_VAL:
+      free_inner_type(data.ffi_val.type);
+      break;
+    case ITEM_FFI_INCLUDE:
+      break;
   }
+}
+
+size_t parse_file(const char *src, OoError *err, AsgFile *data) {
+  Token t;
+  err->tag = ERR_NONE;
+  data->src = src;
+  size_t l = 0;
+
+  AsgItem *items = NULL;
+  AsgMeta **all_attrs = NULL; // sb of sbs
+
+  t = tokenize(src + l);
+
+  AsgMeta **attrs = sb_add(all_attrs, 1); // ptr to an sb
+  *attrs = NULL;
+
+  l += parse_attrs(src + l, err, attrs);
+  if (err->tag != ERR_NONE) {
+    err->tag = ERR_FILE;
+    free_sb_items(items);
+    free_sb_sb_meta(all_attrs);
+    return l;
+  }
+
+  AsgItem *item = sb_add(items, 1);
+  l += parse_item(src + l, err, item);
+  if (err->tag != ERR_NONE) {
+    err->tag = ERR_FILE;
+    free_sb_items(items);
+    free_sb_sb_meta(all_attrs);
+    return l;
+  }
+
+  t = tokenize(src + l);
+
+  while (t.tt != END) {
+    AsgMeta **attrs = sb_add(all_attrs, 1); // ptr to an sb
+    *attrs = NULL;
+    l += parse_attrs(src + l, err, attrs);
+    if (err->tag != ERR_NONE) {
+      err->tag = ERR_FILE;
+      free_sb_items(items);
+      free_sb_sb_meta(all_attrs);
+      return l;
+    }
+
+    AsgItem *item = sb_add(items, 1);
+    l += parse_item(src + l, err, item);
+    if (err->tag != ERR_NONE) {
+      err->tag = ERR_FILE;
+      free_sb_items(items);
+      free_sb_sb_meta(all_attrs);
+      return l;
+    }
+
+    t = tokenize(src + l);
+  }
+
+  data->len = l;
+  data->items = items;
+  data->attrs = all_attrs;
+  return l;
+}
+
+void free_inner_file(AsgFile data) {
+  free_sb_items(data.items);
+  free_sb_sb_meta(data.attrs);
 }
