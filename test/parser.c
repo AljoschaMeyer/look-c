@@ -1256,7 +1256,6 @@ void test_use_tree(void) {
   free_inner_use_tree(data);
 
   src = "super::{dep, magic, mod}";
-  src = "super::{dep, magic, mod}";
   assert(parse_use_tree(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.len == strlen(src));
@@ -1267,6 +1266,104 @@ void test_use_tree(void) {
   assert(data.branch[1].tag == USE_TREE_LEAF);
   assert(data.branch[2].tag == USE_TREE_LEAF);
   free_inner_use_tree(data);
+}
+
+void test_item(void) {
+  char *src = "pub use a::b";
+  OoError err;
+  AsgItem data;
+
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_USE);
+  assert(data.pub);
+  assert(data.use.tag == USE_TREE_BRANCH);
+  free_inner_item(data);
+
+  src = "use a::b";
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_USE);
+  assert(!data.pub);
+  assert(data.use.tag == USE_TREE_BRANCH);
+  free_inner_item(data);
+
+  src = "type a =@ b";
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_TYPE);
+  assert(!data.pub);
+  assert(data.type.sid.len == 1);
+  assert(data.type.type.tag == TYPE_PTR);
+  free_inner_item(data);
+
+  src = "val a = @b";
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_VAL);
+  assert(!data.pub);
+  assert(!data.val.mut);
+  assert(data.val.sid.len == 1);
+  assert(data.val.exp.tag == EXP_REF);
+  free_inner_item(data);
+
+  src = "pub val mut a = @b";
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_VAL);
+  assert(data.pub);
+  assert(data.val.mut);
+  assert(data.val.sid.len == 1);
+  assert(data.val.exp.tag == EXP_REF);
+  free_inner_item(data);
+
+  // src = "fn a = () {}";
+  // assert(parse_item(src, &err, &data) == strlen(src));
+  // assert(err.tag == ERR_NONE);
+  // assert(data.len == strlen(src));
+  // assert(data.tag == ITEM_FUN);
+  // assert(!data.pub);
+  // assert(data.fun.sid.len == 1);
+  // assert(sb_count(data.fun.type_args) == 0);
+  // assert(sb_count(data.fun.arg_sids) == 0);
+  // assert(sb_count(data.fun.arg_types) == 0);
+  // assert(data.fun.ret.tag = TYPE_PRODUCT_ANON);
+  // assert(sb_count(data.fun.ret.product_anon) == 0);
+  // assert(sb_count(data.fun.body.exps) == 0);
+  // free_inner_item(data);
+
+  src = "fn a = <T> => (b: T) -> @c {a}";
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_FUN);
+  assert(!data.pub);
+  assert(data.fun.sid.len == 1);
+  assert(sb_count(data.fun.type_args) == 1);
+  assert(sb_count(data.fun.arg_sids) == 1);
+  assert(sb_count(data.fun.arg_types) == 1);
+  assert(data.fun.ret.tag = TYPE_PTR);
+  assert(sb_count(data.fun.body.exps) == 1);
+  free_inner_item(data);
+
+  src = "fn a = <T, U> => (b: T, d: U) -> @c {a; b}";
+  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.len == strlen(src));
+  assert(data.tag == ITEM_FUN);
+  assert(!data.pub);
+  assert(data.fun.sid.len == 1);
+  assert(sb_count(data.fun.type_args) == 2);
+  assert(sb_count(data.fun.arg_sids) == 2);
+  assert(sb_count(data.fun.arg_types) == 2);
+  assert(data.fun.ret.tag = TYPE_PTR);
+  assert(sb_count(data.fun.body.exps) == 2);
+  free_inner_item(data);
 }
 
 int main(void) {
@@ -1280,6 +1377,7 @@ int main(void) {
   test_exp();
   test_meta();
   test_use_tree();
+  test_item();
 
   return 0;
 }

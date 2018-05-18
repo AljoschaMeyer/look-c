@@ -2976,3 +2976,316 @@ void free_inner_use_tree(AsgUseTree data) {
       return;
   }
 }
+
+size_t parse_item(const char *src, OoError *err, AsgItem *data) {
+  Token t;
+  err->tag = ERR_NONE;
+  data->src = src;
+  size_t l = 0;
+
+  t = tokenize(src);
+  if (t.tt == PUB) {
+    data->pub = true;
+    l += t.len;
+    t = tokenize(src + l);
+  } else {
+    data->pub = false;
+  }
+  l += t.len;
+
+  switch (t.tt) {
+    case USE:
+      l += parse_use_tree(src + l, err, &data->use);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_ITEM;
+        return l;
+      }
+
+      data->tag = ITEM_USE;
+      data->len = l;
+      return l;
+    case TYPE:
+      l += parse_sid(src + l, err, &data->type.sid);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_ITEM;
+        return l;
+      }
+
+      t = tokenize(src + l);
+      if (t.tt != EQ) {
+        err->tag = ERR_ITEM;
+        err->tt = t.tt;
+        return l;
+      }
+      l += t.len;
+
+      l += parse_type(src + l, err, &data->type.type);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_ITEM;
+        return l;
+      }
+
+      data->tag = ITEM_TYPE;
+      data->len = l;
+      return l;
+    case VAL:
+      t = tokenize(src + l);
+      if (t.tt == MUT) {
+        data->val.mut = true;
+        l += t.len;
+        t = tokenize(src + l);
+      } else {
+        data->val.mut = false;
+      }
+
+      l += parse_sid(src + l, err, &data->val.sid);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_ITEM;
+        return l;
+      }
+
+      t = tokenize(src + l);
+      if (t.tt != EQ) {
+        err->tag = ERR_ITEM;
+        err->tt = t.tt;
+        return l;
+      }
+      l += t.len;
+
+      l += parse_exp(src + l, err, &data->val.exp);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_ITEM;
+        return l;
+      }
+
+      data->tag = ITEM_VAL;
+      data->len = l;
+      return l;
+    case FN:
+      l += parse_sid(src + l, err, &data->type.sid);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_ITEM;
+        return l;
+      }
+
+      t = tokenize(src + l);
+      if (t.tt != EQ) {
+        err->tag = ERR_ITEM;
+        err->tt = t.tt;
+        return l;
+      }
+      l += t.len;
+
+      t = tokenize(src + l);
+      if (t.tt == LANGLE) {
+        l += t.len;
+
+        AsgSid *type_args = NULL;
+        AsgSid *type_arg = sb_add(type_args, 1);
+        l += parse_sid(src + l, err, type_arg);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_ITEM;
+          sb_free(type_args);
+          return l;
+        }
+
+        t = tokenize(src + l);
+        l += t.len;
+        if (t.tt != COMMA && t.tt != RANGLE) {
+          err->tag = ERR_ITEM;
+          err->tt = t.tt;
+          sb_free(type_args);
+          return l;
+        } else {
+          while (t.tt == COMMA) {
+            type_arg = sb_add(type_args, 1);
+            l += parse_sid(src + l, err, type_arg);
+            if (err->tag != ERR_NONE) {
+              err->tag = ERR_ITEM;
+              sb_free(type_args);
+              return l;
+            }
+
+            t = tokenize(src + l);
+            l += t.len;
+          }
+          if (t.tt != RANGLE) {
+            err->tag = ERR_ITEM;
+            err->tt = t.tt;
+            sb_free(type_args);
+            return l;
+          }
+
+          data->fun.type_args = type_args;
+
+          t = tokenize(src + l);
+          l += t.len;
+          if (t.tt != FAT_ARROW) {
+            err->tag = ERR_ITEM;
+            err->tt = t.tt;
+            sb_free(type_args);
+            return l;
+          }
+
+          t = tokenize(src + l);
+        }
+      } else {
+        data->fun.type_args = NULL;
+      }
+
+      if (t.tt != LPAREN) {
+        err->tag = ERR_ITEM;
+        err->tt = t.tt;
+        sb_free(data->fun.type_args);
+        return l;
+      }
+      l += t.len;
+
+      t = tokenize(src + l);
+      if (t.tt == RPAREN) {
+        data->fun.arg_sids = NULL;
+        data->fun.arg_types = NULL;
+        l += t.len;
+      } else {
+        AsgSid *sids = NULL;
+        AsgType *types = NULL;
+
+        AsgSid *sid = sb_add(sids, 1);
+        l += parse_sid(src + l, err, sid);
+
+        t = tokenize(src + l);
+        l += t.len;
+        if (t.tt != COLON) {
+          err->tag = ERR_ITEM;
+          err->tt = t.tt;
+          sb_free(data->fun.type_args);
+          sb_free(sids);
+          free_sb_types(types);
+          return l;
+        }
+
+        AsgType *type;
+        type = sb_add(types, 1);
+        l += parse_type(src + l, err, type);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_ITEM;
+          sb_free(data->fun.type_args);
+          sb_free(sids);
+          free_sb_types(types);
+          return l;
+        }
+        t = tokenize(src + l);
+        l += t.len;
+
+        while (t.tt == COMMA) {
+          sid = sb_add(sids, 1);
+          l += parse_sid(src + l, err, sid);
+          if (err->tag != ERR_NONE) {
+            err->tag = ERR_ITEM;
+            sb_free(data->fun.type_args);
+            sb_free(sids);
+            free_sb_types(types);
+            return l;
+          }
+
+          t = tokenize(src + l);
+          l += t.len;
+          if (t.tt != COLON) {
+            err->tag = ERR_ITEM;
+            err->tt = t.tt;
+            sb_free(data->fun.type_args);
+            sb_free(sids);
+            free_sb_types(types);
+            return l;
+          }
+
+          type = sb_add(types, 1);
+          l += parse_type(src + l, err, type);
+          if (err->tag != ERR_NONE) {
+            err->tag = ERR_ITEM;
+            sb_free(data->fun.type_args);
+            sb_free(sids);
+            free_sb_types(types);
+            return l;
+          }
+
+          t = tokenize(src + l);
+          l += t.len;
+        }
+
+        if (t.tt != RPAREN) {
+          err->tag = ERR_ITEM;
+          err->tt = t.tt;
+          sb_free(data->fun.type_args);
+          sb_free(sids);
+          free_sb_types(types);
+          return l;
+        }
+        l += t.len;
+        data->fun.arg_sids = sids;
+        data->fun.arg_types = types;
+      }
+
+
+
+      t = tokenize(src + l);
+      if (t.tt == ARROW) {
+        l += t.len;
+        l += parse_type(src + l, err, &data->fun.ret);
+        if (err->tag != ERR_NONE) {
+          err->tag = ERR_ITEM;
+          sb_free(data->fun.type_args);
+          sb_free(data->fun.arg_sids);
+          free_sb_types(data->fun.arg_types);
+          return l;
+        }
+      } else {
+        data->fun.ret.src = src + l;
+        data->fun.ret.len = 0;
+        data->fun.ret.tag = TYPE_PRODUCT_ANON;
+        data->fun.ret.product_anon = NULL;
+      }
+
+      l += parse_block(src + l, err, &data->fun.body);
+      if (err->tag != ERR_NONE) {
+        err->tag = ERR_ITEM;
+        sb_free(data->fun.type_args);
+        sb_free(data->fun.arg_sids);
+        free_sb_types(data->fun.arg_types);
+        free_inner_type(data->fun.ret);
+        return l;
+      }
+
+      data->tag = ITEM_FUN;
+      data->len = l;
+      return l;
+    default:
+      err->tag = ERR_ITEM;
+      err->tt = t.tt;
+      data->len = l;
+      return l;
+  }
+}
+
+void free_inner_item(AsgItem data) {
+  switch (data.tag) {
+    case ITEM_USE:
+      free_inner_use_tree(data.use);
+      break;
+    case ITEM_TYPE:
+      free_inner_type(data.type.type);
+      break;
+    case ITEM_VAL:
+      free_inner_exp(data.val.exp);
+      break;
+    case ITEM_FUN:
+      sb_free(data.fun.type_args);
+      sb_free(data.fun.arg_sids);
+      free_sb_types(data.fun.arg_types);
+      free_inner_type(data.fun.ret);
+      free_inner_block(data.fun.body);
+      break;
+    default:
+      return;
+  }
+}

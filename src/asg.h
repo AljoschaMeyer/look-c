@@ -131,8 +131,6 @@ typedef struct AsgFile {
   rax *items_by_id; // stores `AsgItem`s TODO remove this, keep analysis separate?
 } AsgFile;
 
-// TODO functions: parse, typecheck (context?), free (does not free source string)
-
 typedef enum {
   META_NULLARY,
   META_UNARY,
@@ -535,13 +533,12 @@ typedef struct AsgItemVal {
 } AsgItemVal;
 
 typedef struct AsgItemFun {
-  AsgSid *type_args;
-  size_t type_args_len;
-  AsgSid *arg_sids;
-  AsgType *arg_types; // same length as arg_sids
-  size_t arg_sids_len;
-  AsgType *ret; // may be null if return type is omitted
-  AsgBlock *body;
+  AsgSid sid;
+  AsgSid *type_args; // stretchy buffer
+  AsgSid *arg_sids; //stretchy buffer
+  AsgType *arg_types; // stretchy buffer, same length as arg_sids
+  AsgType ret; // empty anon product if return type is omitted in the syntax
+  AsgBlock body;
 } AsgItemFun;
 
 typedef struct AsgItemFfiInclude {
@@ -559,8 +556,6 @@ typedef struct AsgItem {
   const char *src;
   size_t len;
   TagItem tag;
-  AsgMeta *attrs;
-  size_t attrs_len;
   bool pub; // ignored for ffi_includes
   union {
     AsgUseTree use;

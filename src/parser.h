@@ -22,7 +22,8 @@ typedef enum {
   ERR_BLOCK,
   ERR_ATTR,
   ERR_META,
-  ERR_USE_TREE
+  ERR_USE_TREE,
+  ERR_ITEM
 } OoTagError;
 
 typedef struct OoError {
@@ -67,5 +68,6 @@ void free_inner_exp(AsgExp data);
 void free_inner_block(AsgBlock data);
 void free_inner_meta(AsgMeta data);
 void free_inner_use_tree(AsgUseTree data);
+void free_inner_item(AsgItem data);
 
 #endif
