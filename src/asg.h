@@ -131,6 +131,10 @@ typedef struct AsgFile {
   // rax *items_by_id; // stores `AsgItem`s TODO remove this, keep analysis separate?
 } AsgFile;
 
+// Filters out all items and expressions with cc (conditional compilation)
+// attributes whose feature is not in the given rax.
+void oo_filter_cc(AsgFile *asg, rax *features);
+
 typedef enum {
   META_NULLARY,
   META_UNARY,

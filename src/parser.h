@@ -72,4 +72,8 @@ void free_inner_use_tree(AsgUseTree data);
 void free_inner_item(AsgItem data);
 void free_inner_file(AsgFile data);
 
+// Free a stretchy buffer and recursively free its contents
+void free_sb_meta(AsgMeta *sb);
+void free_sb_exp(AsgExp *sb);
+
 #endif

@@ -371,7 +371,7 @@ raxNode *raxCompressNode(raxNode *n, unsigned char *s, size_t len, raxNode **chi
  * means that the current node represents the key (that is, none of the
  * compressed node characters are needed to represent the key, just all
  * its parents nodes). */
-static inline size_t raxLowWalk(rax *rax, unsigned char *s, size_t len, raxNode **stopnode, raxNode ***plink, int *splitpos, raxStack *ts) {
+static inline size_t raxLowWalk(rax *rax, const unsigned char *s, size_t len, raxNode **stopnode, raxNode ***plink, int *splitpos, raxStack *ts) {
     raxNode *h = rax->head;
     raxNode **parentlink = &rax->head;
 
@@ -807,7 +807,7 @@ oom:
 /* Find a key in the rax, returns raxNotFound special void pointer value
  * if the item was not found, otherwise the value associated with the
  * item is returned. */
-void *raxFind(rax *rax, unsigned char *s, size_t len) {
+void *raxFind(rax *rax, const unsigned char *s, size_t len) {
     raxNode *h;
 
     debugf("### Lookup: %.*s\n", (int)len, s);
@@ -1776,4 +1776,3 @@ void raxDebugShowNode(const char *msg, raxNode *n) {
     printf("\n");
     fflush(stdout);
 }
-

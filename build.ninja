@@ -8,7 +8,9 @@ rule cc
   command = gcc -MMD -MF $out.d -c $cflags $in -o $out
 
 rule ld
-  command = gcc $in -o $out
+  command = gcc $in -o $out -lm
+
+build $builddir/rax.o: cc src/rax.c
 
 build $builddir/lexer.o: cc src/lexer.c
 build $builddir/test/lexer.o: cc test/lexer.c
@@ -18,3 +20,6 @@ build $builddir/parser.o: cc src/parser.c
 build $builddir/test/parser.o: cc test/parser.c
 build $builddir/test/parser: ld $builddir/test/parser.o $builddir/parser.o $builddir/lexer.o
 
+build $builddir/cc.o: cc src/cc.c
+build $builddir/test/cc.o: cc test/cc.c
+build $builddir/test/cc: ld $builddir/test/cc.o $builddir/cc.o $builddir/parser.o $builddir/lexer.o $builddir/rax.o
