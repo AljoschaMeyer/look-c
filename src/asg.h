@@ -356,8 +356,6 @@ typedef enum {
   EXP_PRODUCT_ACCESS_NAMED,
   EXP_FUN_APP_ANON,
   EXP_FUN_APP_NAMED,
-  EXP_TYPE_APP_ANON,
-  EXP_TYPE_APP_NAMED,
   EXP_CAST,
   EXP_SIZE_OF,
   EXP_ALIGN_OF,
@@ -413,19 +411,6 @@ typedef struct AsgExpFunAppNamed {
   AsgExp *args; // stretchy buffer
   AsgSid *sids; // stretchy buffer,  same length as args
 } AsgExpFunAppNamed;
-
-typedef struct AsgExpTypeAppAnon {
-  AsgId type;
-  AsgType *args;
-  size_t args_len;
-} AsgExpTypeAppAnon;
-
-typedef struct AsgExpTypeAppNamed {
-  AsgId type;
-  AsgType *args;
-  AsgSid *names; // same length as args
-  size_t args_len;
-} AsgExpTypeAppNamed;
 
 typedef struct AsgExpCast {
   AsgExp *inner;
@@ -507,8 +492,6 @@ typedef struct AsgExp {
     AsgExpProductAccessNamed product_access_named;
     AsgExpFunAppAnon fun_app_anon;
     AsgExpFunAppNamed fun_app_named;
-    AsgExpTypeAppAnon type_app_anon;
-    AsgExpTypeAppNamed type_app_named;
     AsgExpCast cast;
     AsgType *size_of;
     AsgType *align_of;

@@ -22,6 +22,8 @@ static bool should_stay(AsgMeta *attrs, rax *features) {
   return true;
 }
 
+static void filter_exp_sb(AsgExp *exps, rax *features);
+
 static void filter_block(AsgBlock *block, rax *features) {
   AsgMeta **new_attrs = NULL;
   AsgExp *new_exps = NULL;
@@ -35,47 +37,130 @@ static void filter_block(AsgBlock *block, rax *features) {
       new_attrs[copied] = block->attrs[i];
       sb_add(new_exps, 1);
       new_exps[copied] = block->exps[i];
-
-      switch (new_exps[copied].tag) {
-        case EXP_IF:
-          filter_block(&new_exps[copied].exp_if.if_block, features);
-          filter_block(&new_exps[copied].exp_if.else_block, features);
-          break;
-        case EXP_WHILE:
-          filter_block(&new_exps[copied].exp_while.block, features);
-          break;
-        case EXP_CASE:
-          ;
-          int count_case = sb_count(new_exps[copied].exp_case.blocks);
-          for (int j_case = 0; j_case < count_case; j_case++) {
-            filter_block(&new_exps[copied].exp_case.blocks[j_case], features);
-          }
-          break;
-        case EXP_LOOP:
-          ;
-          int count_loop = sb_count(new_exps[copied].exp_loop.blocks);
-          for (int j_loop = 0; j_loop < count_loop; j_loop++) {
-            filter_block(&new_exps[copied].exp_loop.blocks[j_loop], features);
-          }
-          break;
-        case EXP_BLOCK:
-          filter_block(&new_exps[copied].block, features);
-          break;
-        default:
-          break;
-      }
-
       copied += 1;
     } else {
       free_sb_meta(block->attrs[i]);
       free_inner_exp(block->exps[i]);
     }
+
+    filter_exp_sb(block->exps, features);
   }
 
   sb_free(block->attrs);
   block->attrs = new_attrs;
   sb_free(block->exps);
   block->exps = new_exps;
+}
+
+static void filter_block_sb(AsgBlock *blocks, rax *features) {
+  int count = sb_count(blocks);
+  for (int i = 0; i < count; i++) {
+    filter_block(&blocks[i], features);
+  }
+}
+
+static void filter_exp(AsgExp *exp, rax *features);
+
+static void filter_exp_sb(AsgExp *exps, rax *features) {
+  int count = sb_count(exps);
+  for (int i = 0; i < count; i++) {
+    filter_exp(&exps[i], features);
+  }
+}
+
+static void filter_exp(AsgExp *exp, rax *features) {
+  switch (exp->tag) {
+    case EXP_REF:
+      filter_exp(exp->ref, features);
+      break;
+    case EXP_REF_MUT:
+      filter_exp(exp->ref_mut, features);
+      break;
+    case EXP_DEREF:
+      filter_exp(exp->deref, features);
+      break;
+    case EXP_DEREF_MUT:
+      filter_exp(exp->deref_mut, features);
+      break;
+    case EXP_ARRAY:
+      filter_exp(exp->array, features);
+      break;
+    case EXP_ARRAY_INDEX:
+      filter_exp(exp->array_index.arr, features);
+      filter_exp(exp->array_index.index, features);
+      break;
+    case EXP_PRODUCT_REPEATED:
+      filter_exp(exp->product_repeated.inner, features);
+      break;
+    case EXP_PRODUCT_ANON:
+      filter_exp_sb(exp->product_anon, features);
+      break;
+    case EXP_PRODUCT_NAMED:
+      filter_exp_sb(exp->product_named.inners, features);
+      break;
+    case EXP_PRODUCT_ACCESS_ANON:
+      filter_exp(exp->product_access_anon.inner, features);
+      break;
+    case EXP_PRODUCT_ACCESS_NAMED:
+      filter_exp(exp->product_access_named.inner, features);
+      break;
+    case EXP_FUN_APP_ANON:
+      filter_exp(exp->fun_app_anon.fun, features);
+      filter_exp_sb(exp->fun_app_anon.args, features);
+      break;
+    case EXP_FUN_APP_NAMED:
+      filter_exp(exp->fun_app_named.fun, features);
+      filter_exp_sb(exp->fun_app_named.args, features);
+      break;
+    case EXP_CAST:
+      filter_exp(exp->cast.inner, features);
+      break;
+    case EXP_NOT:
+      filter_exp(exp->exp_not, features);
+      break;
+    case EXP_NEGATE:
+      filter_exp(exp->exp_negate, features);
+      break;
+    case EXP_BIN_OP:
+      filter_exp(exp->bin_op.lhs, features);
+      filter_exp(exp->bin_op.rhs, features);
+      break;
+    case EXP_ASSIGN:
+      filter_exp(exp->assign.lhs, features);
+      filter_exp(exp->assign.rhs, features);
+      break;
+    case EXP_VAL_ASSIGN:
+      filter_exp(exp->assign.rhs, features);
+      break;
+    case EXP_BLOCK:
+      filter_block(&exp->block, features);
+      break;
+    case EXP_IF:
+      filter_exp(exp->exp_if.cond, features);
+      filter_block(&exp->exp_if.if_block, features);
+      filter_block(&exp->exp_if.else_block, features);
+      break;
+    case EXP_WHILE:
+      filter_exp(exp->exp_while.cond, features);
+      filter_block(&exp->exp_while.block, features);
+      break;
+    case EXP_CASE:
+      filter_exp(exp->exp_case.matcher, features);
+      filter_block_sb(exp->exp_case.blocks, features);
+      break;
+    case EXP_LOOP:
+      filter_exp(exp->exp_loop.matcher, features);
+      filter_block_sb(exp->exp_loop.blocks, features);
+      break;
+    case EXP_RETURN:
+      filter_exp(exp->exp_return, features);
+      break;
+    case EXP_BREAK:
+      filter_exp(exp->exp_break, features);
+      break;
+    default:
+      break;
+  }
 }
 
 void oo_filter_cc(AsgFile *asg, rax *features) {
