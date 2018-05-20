@@ -1,0 +1,54 @@
+/// An `Option` indicates that a value may be either present or absent.
+///
+/// Common uses of this type include optional arguments to functions and partial
+/// functions (by returning an `Option`).
+///
+/// Optional pointers are efficiently represented as null pointers in memory,
+/// thus `sizeof(@T) == sizeof(Option<@T>)`.
+
+// /// Type for optional values: either the is `some` value of type `T`, or there
+// /// is `none`.
+// pub type Option = <T> => pub
+//     /// Some value of type `T` is present.
+//     | some(T)
+//     /// No value is present.
+//     | none
+
+// #[test_pure]
+// fn null_pointer_optimization = () {
+//   assert(sizeof(@Usize) == sizeof(Option<@Usize>))
+// }
+//
+// /// Returns whether `opt` is a `some`.
+// ///
+// /// This returns `true` iff `is_none` returns `false`.
+// pub fn is_some = <T> => (opt: @Option<T>) -> Bool {
+//     case opt {
+//         @|some(_) { true }
+//         @|none { false }
+//     }
+// }
+
+// /// Returns whether `opt` is a `none`.
+// ///
+// /// This returns `true` iff `is_some` returns `false`.
+// pub fn is_none = <T> => (opt: @Option<T>) -> Bool {
+//     case opt {
+//         @|some(_) { false }
+//         @|none { true }
+//     }
+// }
+
+#[test_pure]
+fn is_some_iff_not_is_none = (x: Option<Usize>) {
+    assert(is_some(x) == !is_none(x))
+    // a(b(c) == !d(e))
+}
+
+// Prior art:
+// - [rust](https://doc.rust-lang.org/std/option/enum.Option.html)
+// - [java](https://docs.oracle.com/javase/8/docs/api/java/util/Optional.html)
+// - [scala](https://www.scala-lang.org/api/current/scala/Option.html)
+// - [nim](https://nim-lang.org/docs/options.html)
+// - and countless others
+// Another popular name for this type is `Maybe`.

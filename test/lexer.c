@@ -166,10 +166,6 @@ void test_id(void) {
   assert(t.tt == KW_MOD);
   assert(t.len == 3);
 
-  t = tokenize("super");
-  assert(t.tt == SUPER);
-  assert(t.len == 5);
-
   t = tokenize("dep");
   assert(t.tt == DEP);
   assert(t.len == 3);

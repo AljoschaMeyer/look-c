@@ -7,15 +7,16 @@
 #include "asg.h"
 #include "stretchy_buffer.h"
 
-size_t parse_id(const char *src, OoError *err, AsgId *data) {
-  size_t l = 0;
-  Token t;
+size_t parse_id(const char *src, ParserError *err, AsgId *data) {
+  Token t = tokenize(src);
+  size_t leading_ws = t.len - t.token_len;
+  data->src = src + leading_ws;
 
   err->tag = ERR_NONE;
   data->sids = NULL;
   AsgSid *sid = sb_add(data->sids, 1);
 
-  l += parse_sid(src, err, sid);
+  size_t l = parse_sid(src, err, sid);
   if (err->tag != ERR_NONE) {
     sb_free(data->sids);
     return l;
@@ -36,7 +37,7 @@ size_t parse_id(const char *src, OoError *err, AsgId *data) {
   }
   l -= t.len;
 
-  data->len = l;
+  data->len = l - leading_ws;
   return l;
 }
 
@@ -44,8 +45,10 @@ void free_inner_id(AsgId data) {
   sb_free(data.sids);
 }
 
-size_t parse_sid(const char *src, OoError *err, AsgSid *data) {
+size_t parse_sid(const char *src, ParserError *err, AsgSid *data) {
   Token t = tokenize(src);
+  size_t leading_ws = t.len - t.token_len;
+  data->src = src + leading_ws;
 
   if (t.tt != ID) {
     err->tag = ERR_SID;
@@ -55,20 +58,18 @@ size_t parse_sid(const char *src, OoError *err, AsgSid *data) {
     err->tag = ERR_NONE;
   }
 
-  data->src = src + (t.len - t.token_len);
   data->len = t.token_len;
-
   return t.len;
 }
 
-size_t parse_macro_inv(const char *src, OoError *err, AsgMacroInv *data) {
+size_t parse_macro_inv(const char *src, ParserError *err, AsgMacroInv *data) {
   err->tag = ERR_MACRO_INV;
 
-  size_t l = 0;
-  Token t;
+  Token t = tokenize(src);
+  size_t leading_ws = t.len - t.token_len;
+  data->src = src + leading_ws;
 
-  t = tokenize(src);
-  l += t.len;
+  size_t l = t.len;
   if (t.tt != DOLLAR) {
     err->tt = t.tt;
     return l;
@@ -110,15 +111,16 @@ size_t parse_macro_inv(const char *src, OoError *err, AsgMacroInv *data) {
   data->args_len = l - (args_start + t.len); // last RPAREN is not part of the args
 
   err->tag = ERR_NONE;
-  data->src = src;
-  data->len = l;
+  data->len = l - leading_ws;
   return l;
 }
 
-size_t parse_literal(const char *src, OoError *err, AsgLiteral *data) {
+size_t parse_literal(const char *src, ParserError *err, AsgLiteral *data) {
   Token t = tokenize(src);
+  size_t leading_ws = t.len - t.token_len;
+  data->src = src + leading_ws;
+
   err->tag = ERR_NONE;
-  data->src = src + (t.len - t.token_len);
   data->len = t.token_len;
 
   if (t.tt == INT) {
@@ -134,7 +136,7 @@ size_t parse_literal(const char *src, OoError *err, AsgLiteral *data) {
   return t.len;
 }
 
-size_t parse_bin_op(const char *src, OoError *err, AsgBinOp *op) {
+size_t parse_bin_op(const char *src, ParserError *err, AsgBinOp *op) {
   size_t l;
   err->tag = ERR_NONE;
   Token t = tokenize(src);
@@ -210,7 +212,7 @@ size_t parse_bin_op(const char *src, OoError *err, AsgBinOp *op) {
   }
 }
 
-size_t parse_assign_op(const char *src, OoError *err, AsgAssignOp *op) {
+size_t parse_assign_op(const char *src, ParserError *err, AsgAssignOp *op) {
   size_t l;
   err->tag = ERR_NONE;
   Token t = tokenize(src);
@@ -291,12 +293,14 @@ size_t parse_assign_op(const char *src, OoError *err, AsgAssignOp *op) {
   }
 }
 
-size_t parse_size_of(const char *src, OoError *err, AsgType *data) {
+size_t parse_size_of(const char *src, ParserError *err, AsgType *data) {
   err->tag = ERR_NONE;
   size_t l;
   Token t;
 
   t = tokenize(src);
+  size_t leading_ws = t.len - t.token_len;
+  data->src = src + leading_ws;
   l = t.len;
   if (t.tt != SIZEOF) {
     err->tag = ERR_TYPE;
@@ -325,15 +329,18 @@ size_t parse_size_of(const char *src, OoError *err, AsgType *data) {
     return l;
   }
 
+  data->len = l - leading_ws;
   return l;
 }
 
-size_t parse_align_of(const char *src, OoError *err, AsgType *data) {
+size_t parse_align_of(const char *src, ParserError *err, AsgType *data) {
   err->tag = ERR_NONE;
   size_t l;
   Token t;
 
   t = tokenize(src);
+  size_t leading_ws = t.len - t.token_len;
+  data->src = src + leading_ws;
   l = t.len;
   if (t.tt != ALIGNOF) {
     err->tag = ERR_TYPE;
@@ -362,13 +369,15 @@ size_t parse_align_of(const char *src, OoError *err, AsgType *data) {
     return l;
   }
 
+  data->len = l - leading_ws;
   return l;
 }
 
-size_t parse_repeat(const char *src, OoError *err, AsgRepeat *data) {
+size_t parse_repeat(const char *src, ParserError *err, AsgRepeat *data) {
   Token t = tokenize(src);
+  size_t leading_ws = t.len - t.token_len;
+  data->src = src + leading_ws;
   err->tag = ERR_NONE;
-  data->src = src + (t.len - t.token_len);
   size_t l = 0;
 
   if (t.tt == INT) {
@@ -381,7 +390,7 @@ size_t parse_repeat(const char *src, OoError *err, AsgRepeat *data) {
       err->tag = ERR_REPEAT;
       return l;
     }
-    data->len = l;
+    data->len = l - leading_ws;
     data->tag = REPEAT_MACRO;
   } else if (t.tt == SIZEOF) {
     l += parse_size_of(src, err, data->size_of);
@@ -389,7 +398,7 @@ size_t parse_repeat(const char *src, OoError *err, AsgRepeat *data) {
       err->tag = ERR_REPEAT;
       return l;
     }
-    data->len = l;
+    data->len = l - leading_ws;
     data->tag = REPEAT_SIZE_OF;
   } else if (t.tt == ALIGNOF) {
     l += parse_align_of(src, err, data->align_of);
@@ -397,7 +406,7 @@ size_t parse_repeat(const char *src, OoError *err, AsgRepeat *data) {
       err->tag = ERR_REPEAT;
       return l;
     }
-    data->len = l;
+    data->len = l - leading_ws;
     data->tag = REPEAT_ALIGN_OF;
   } else {
     err->tag = ERR_REPEAT;
@@ -434,7 +443,7 @@ size_t parse_repeat(const char *src, OoError *err, AsgRepeat *data) {
     return l;
   }
 
-  data->len = l;
+  data->len = l - leading_ws;
   return l;
 }
 
@@ -473,10 +482,11 @@ void free_sb_summands(AsgSummand *sb) {
   sb_free(sb);
 }
 
-size_t parse_type(const char *src, OoError *err, AsgType *data) {
+size_t parse_type(const char *src, ParserError *err, AsgType *data) {
   Token t = tokenize(src);
+  size_t leading_ws = t.len - t.token_len;
+  data->src = src + leading_ws;
   err->tag = ERR_NONE;
-  data->src = src + (t.len - t.token_len);
   size_t l = 0;
 
   AsgId id;
@@ -551,7 +561,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
 
             if (t.tt == RANGLE) {
               data->tag = TYPE_APP_NAMED;
-              data->len = l;
+              data->len = l - leading_ws;
               data->app_named.tlf = id;
               data->app_named.types = types;
               data->app_named.sids = sids;
@@ -603,7 +613,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
           }
 
           data->tag = TYPE_APP_ANON;
-          data->len = l;
+          data->len = l - leading_ws;
           data->app_anon.tlf = id;
           data->app_anon.args = inners;
           return l;
@@ -631,7 +641,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
         free(inner_ptr);
       }
       data->tag = TYPE_PTR;
-      data->len = l;
+      data->len = l - leading_ws;
       data->ptr = inner_ptr;
       return l;
     case TILDE:
@@ -642,7 +652,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
         free(inner_ptr_mut);
       }
       data->tag = TYPE_PTR_MUT;
-      data->len = l;
+      data->len = l - leading_ws;
       data->ptr_mut = inner_ptr_mut;
       return l;
     case LBRACKET:
@@ -665,7 +675,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
       }
 
       data->tag = TYPE_ARRAY;
-      data->len = l;
+      data->len = l - leading_ws;
       data->array = inner_array;
       return l;
     case LANGLE:
@@ -724,7 +734,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
         }
 
         data->tag = TYPE_GENERIC;
-        data->len = l;
+        data->len = l - leading_ws;
         data->generic.args = args;
         data->generic.inner = inner;
         return l;
@@ -749,12 +759,12 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
             return l;
           }
           data->tag = TYPE_FUN_ANON;
-          data->len = l;
+          data->len = l - leading_ws;
           data->fun_anon.args = NULL;
           data->fun_anon.ret = ret;
           return l;
         } else {
-          data->len = l;
+          data->len = l - leading_ws;
           data->tag = TYPE_PRODUCT_ANON;
           data->product_anon = NULL;
           return l;
@@ -827,14 +837,14 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
               return l;
             }
             data->tag = TYPE_FUN_NAMED;
-            data->len = l;
+            data->len = l - leading_ws;
             data->fun_named.arg_types = types;
             data->fun_named.arg_sids = sids;
             data->fun_named.ret = ret;
             return l;
           }
           data->tag = TYPE_PRODUCT_NAMED;
-          data->len = l;
+          data->len = l - leading_ws;
           data->product_named.types = types;
           data->product_named.sids = sids;
           return l;
@@ -870,7 +880,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
         }
 
         data->tag = TYPE_PRODUCT_REPEATED;
-        data->len = l;
+        data->len = l - leading_ws;
         AsgType *inner = malloc(sizeof(AsgType));
         memcpy(inner, inners, sizeof(AsgType));
         data->product_repeated.inner = inner;
@@ -914,13 +924,13 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
             return l;
           }
           data->tag = TYPE_FUN_ANON;
-          data->len = l;
+          data->len = l - leading_ws;
           data->fun_anon.args = inners;
           data->fun_anon.ret = ret;
           return l;
         } else {
           data->tag = TYPE_PRODUCT_ANON;
-          data->len = l;
+          data->len = l - leading_ws;
           data->product_anon = inners;
           return l;
         }
@@ -949,7 +959,7 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
       }
 
       data->tag = TYPE_SUM;
-      data->len = l;
+      data->len = l - leading_ws;
       data->sum.pub = pub;
       data->sum.summands = summands;
       return l;
@@ -961,10 +971,11 @@ size_t parse_type(const char *src, OoError *err, AsgType *data) {
   }
 }
 
-size_t parse_summand(const char *src, OoError *err, AsgSummand *data) {
-  data->src = src;
+size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
   size_t l = 0;
   Token t = tokenize(src);
+  size_t leading_ws = t.len - t.token_len;
+  data->src = src + leading_ws;
   l += t.len;
   if (t.tt != PIPE) {
     err->tag = ERR_SUMMAND;
@@ -1041,7 +1052,7 @@ size_t parse_summand(const char *src, OoError *err, AsgSummand *data) {
 
         if (t.tt == RPAREN) {
           data->tag = SUMMAND_NAMED;
-          data->len = l;
+          data->len = l - leading_ws;
           data->named.inners = types;
           data->named.sids = sids;
           return l;
@@ -1093,13 +1104,13 @@ size_t parse_summand(const char *src, OoError *err, AsgSummand *data) {
       }
 
       data->tag = SUMMAND_ANON;
-      data->len = l;
+      data->len = l - leading_ws;
       data->anon = inners;
       return l;
     }
   } else {
     // Identifier without parens (empty anon)
-    data->len = l;
+    data->len = l - leading_ws;
     data->tag = SUMMAND_ANON;
     data->anon = NULL;
     return l;
@@ -1107,6 +1118,10 @@ size_t parse_summand(const char *src, OoError *err, AsgSummand *data) {
 }
 
 void free_inner_type(AsgType data) {
+  printf("\n");
+  printf("\n");
+  fwrite(data.src, sizeof(char), data.len, stdout);
+  printf("\n");
   switch (data.tag) {
     case TYPE_ID:
       free_inner_id(data.id);
@@ -1177,10 +1192,10 @@ void free_sb_patterns(AsgPattern *sb) {
   sb_free(sb);
 }
 
-size_t parse_pattern(const char *src, OoError *err, AsgPattern *data) {
+size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
   Token t = tokenize(src);
   err->tag = ERR_NONE;
-  data->src = src + (t.len - t.token_len);
+  data->src = src;
   size_t l = 0;
 
   bool mut = false;
@@ -1560,10 +1575,10 @@ void free_sb_sb_meta(AsgMeta **sb) {
   sb_free(sb);
 }
 
-size_t parse_meta(const char *src, OoError *err, AsgMeta *data) {
+size_t parse_meta(const char *src, ParserError *err, AsgMeta *data) {
   Token t = tokenize(src);
   err->tag = ERR_NONE;
-  data->src = src + (t.len - t.token_len);
+  data->src = src;
   size_t l = t.len;
   if (t.tt != ID) {
     err->tag = ERR_META;
@@ -1645,10 +1660,10 @@ void free_inner_meta(AsgMeta data) {
   }
 }
 
-size_t parse_attr(const char *src, OoError *err, AsgMeta *data) {
+size_t parse_attr(const char *src, ParserError *err, AsgMeta *data) {
   Token t = tokenize(src);
   err->tag = ERR_NONE;
-  data->src = src + (t.len - t.token_len);
+  data->src = src;
   size_t l = t.len;
 
   if (t.tt != BEGIN_ATTRIBUTE) {
@@ -1675,7 +1690,7 @@ size_t parse_attr(const char *src, OoError *err, AsgMeta *data) {
   return l;
 }
 
-size_t parse_attrs(const char *src, OoError *err, AsgMeta **attrs /* ptr to sb */) {
+size_t parse_attrs(const char *src, ParserError *err, AsgMeta **attrs /* ptr to sb */) {
   size_t l = 0;
   Token t = tokenize(src + l);
   while (t.tt == BEGIN_ATTRIBUTE) {
@@ -1698,10 +1713,10 @@ void free_sb_exps(AsgExp *sb) {
   sb_free(sb);
 }
 
-size_t parse_block(const char *src, OoError *err, AsgBlock *data) {
+size_t parse_block(const char *src, ParserError *err, AsgBlock *data) {
   Token t = tokenize(src);
   err->tag = ERR_NONE;
-  data->src = src + (t.len - t.token_len);
+  data->src = src;
   size_t l = t.len;
 
   if (t.tt != LBRACE) {
@@ -1797,10 +1812,10 @@ void free_sb_blocks(AsgBlock *sb) {
   sb_free(sb);
 }
 
-size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data) {
+size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *data) {
   Token t = tokenize(src);
   err->tag = ERR_NONE;
-  data->src = src + (t.len - t.token_len);
+  data->src = src;
   size_t l = 0;
 
   switch (t.tt) {
@@ -2051,6 +2066,9 @@ size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data)
       data->tag = EXP_NOT;
       data->len = l;
       data->exp_not = inner_not;
+      printf("%s\n", "-----------------------------------");
+      fwrite(data->src, sizeof(char), data->len, stdout);
+      printf("\n");
       return l;
     case MINUS:
       l += t.len;
@@ -2326,7 +2344,7 @@ size_t parse_exp_non_left_recursive(const char *src, OoError *err, AsgExp *data)
   }
 }
 
-size_t parse_exp(const char *src, OoError *err, AsgExp *data) {
+size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
   size_t l = parse_exp_non_left_recursive(src, err, data);
   Token t = tokenize(src + l);
 
@@ -2706,6 +2724,11 @@ size_t parse_exp(const char *src, OoError *err, AsgExp *data) {
 }
 
 void free_inner_exp(AsgExp data) {
+  printf("\n");
+  printf("\n");
+  fwrite(data.src, sizeof(char), data.len, stdout);
+  printf("\n");
+  // printf("%d\n", data.tag);
   switch (data.tag) {
     case EXP_ID:
       free_inner_id(data.id);
@@ -2857,10 +2880,10 @@ void free_sb_use_tree(AsgUseTree *sb) {
   sb_free(sb);
 }
 
-size_t parse_sid_or_use_kw(const char *src, OoError *err, AsgSid *data) {
+size_t parse_sid_or_use_kw(const char *src, ParserError *err, AsgSid *data) {
   Token t = tokenize(src);
 
-  if (t.tt != ID && t.tt != SUPER && t.tt != DEP && t.tt != MAGIC && t.tt != KW_MOD) {
+  if (t.tt != ID && t.tt != DEP && t.tt != MAGIC && t.tt != KW_MOD) {
     err->tag = ERR_SID;
     err->tt = t.tt;
     return t.len;
@@ -2874,7 +2897,7 @@ size_t parse_sid_or_use_kw(const char *src, OoError *err, AsgSid *data) {
   return t.len;
 }
 
-size_t parse_use_tree(const char *src, OoError *err, AsgUseTree *data) {
+size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data) {
   Token t;
   err->tag = ERR_NONE;
   data->src = src;
@@ -2901,7 +2924,7 @@ size_t parse_use_tree(const char *src, OoError *err, AsgUseTree *data) {
   } else if (t.tt == SCOPE) {
     l += t.len;
     t = tokenize(src + l);
-    if (t.tt == ID || t.tt == SUPER || t.tt == DEP || t.tt == MAGIC || t.tt == KW_MOD) {
+    if (t.tt == ID || t.tt == DEP || t.tt == MAGIC || t.tt == KW_MOD) {
       AsgUseTree *inners = NULL;
       AsgUseTree *inner = sb_add(inners, 1);
       l += parse_use_tree(src + l, err, inner);
@@ -2986,7 +3009,7 @@ void free_sb_items(AsgItem *sb) {
   sb_free(sb);
 }
 
-size_t parse_item(const char *src, OoError *err, AsgItem *data) {
+size_t parse_item(const char *src, ParserError *err, AsgItem *data) {
   Token t;
   err->tag = ERR_NONE;
   data->src = src;
@@ -3366,7 +3389,7 @@ void free_inner_item(AsgItem data) {
   }
 }
 
-size_t parse_file(const char *src, OoError *err, AsgFile *data) {
+size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
   Token t;
   err->tag = ERR_NONE;
   data->src = src;

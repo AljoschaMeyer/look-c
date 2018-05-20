@@ -23,3 +23,7 @@ build $builddir/test/parser: ld $builddir/test/parser.o $builddir/parser.o $buil
 build $builddir/cc.o: cc src/cc.c
 build $builddir/test/cc.o: cc test/cc.c
 build $builddir/test/cc: ld $builddir/test/cc.o $builddir/cc.o $builddir/parser.o $builddir/lexer.o $builddir/rax.o
+
+build $builddir/context.o: cc src/context.c
+build $builddir/test/context.o: cc test/context.c
+build $builddir/test/context: ld $builddir/test/context.o $builddir/context.o $builddir/parser.o $builddir/lexer.o $builddir/rax.o

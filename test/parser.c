@@ -8,21 +8,21 @@
 #include "../src/parser.h"
 
 void test_sid() {
-  const char *src = "abc";
+  const char *src = " abc";
   AsgSid data;
-  OoError err;
+  ParserError err;
   size_t l = parse_sid(src, &err, &data);
 
-  assert(l == 3);
+  assert(l == 4);
   assert(err.tag == ERR_NONE);
-  assert(data.src == src);
+  assert(data.src == src + 1);
   assert(data.len == 3);
 }
 
 void test_id() {
   const char *src = "";
   AsgId data;
-  OoError err;
+  ParserError err;
   size_t l = parse_id(src, &err, &data);
   assert(err.tag != ERR_NONE);
 
@@ -34,33 +34,37 @@ void test_id() {
   assert(data.sids[0].src == src);
   free_inner_id(data);
 
-  src = "abc:: def ::ghi";
+  src = "  abc:: def ::ghi";
   l = parse_id(src, &err, &data);
-  assert(l == 15);
+  assert(l == 17);
   assert(err.tag == ERR_NONE);
+  assert(data.src == src + 2);
+  assert(data.len == 15);
   assert(sb_count(data.sids) == 3);
-  assert(data.sids[0].src == src);
+  assert(data.sids[0].src == src + 2);
   assert(data.sids[0].len == 3);
-  assert(data.sids[1].src == src + 6);
-  assert(data.sids[0].len == 3);
-  assert(data.sids[0].len == 3);
-  assert(data.sids[2].src == src + 12);
+  assert(data.sids[1].src == src + 8);
+  assert(data.sids[1].len == 3);
+  assert(data.sids[2].src == src + 14);
+  assert(data.sids[2].len == 3);
   free_inner_id(data);
 }
 
 void test_macro_inv() {
-  const char *src = "$abc()";
+  const char *src = " $ abc() ";
   AsgMacroInv data;
-  OoError err;
+  ParserError err;
   size_t l;
 
   l = parse_macro_inv(src, &err, &data);
-  assert(l == 6);
+  assert(l == 8);
   assert(err.tag == ERR_NONE);
+  assert(data.src == src + 1);
+  assert(data.len == 7);
   assert(data.name_len == 3);
-  assert(data.name == src + 1);
+  assert(data.name == src + 3);
   assert(data.args_len == 0);
-  assert(data.args == src + 5);
+  assert(data.args == src + 7);
 
   src = "$abc(())";
   l = parse_macro_inv(src, &err, &data);
@@ -73,344 +77,372 @@ void test_macro_inv() {
 }
 
 void test_literal() {
-  const char *src = "42";
+  const char *src = " 42 ";
   AsgLiteral data;
-  OoError err;
+  ParserError err;
   size_t l;
 
   l = parse_literal(src, &err, &data);
-  assert(l == 2);
+  assert(l == 3);
   assert(err.tag == ERR_NONE);
-  assert(data.src == src);
+  assert(data.src == src + 1);
   assert(data.len == 2);
   assert(data.tag == LITERAL_INT);
 
-  src = "0.0";
+  src = " 0.0 ";
   l = parse_literal(src, &err, &data);
-  assert(l == 3);
+  assert(l == 4);
   assert(err.tag == ERR_NONE);
-  assert(data.src == src);
+  assert(data.src == src + 1);
   assert(data.len == 3);
   assert(data.tag == LITERAL_FLOAT);
 
-  src = "\"abc\"";
+  src = " \"abc\" ";
   l = parse_literal(src, &err, &data);
-  assert(l == 5);
+  assert(l == 6);
   assert(err.tag == ERR_NONE);
-  assert(data.src == src);
+  assert(data.src == src + 1);
   assert(data.len == 5);
   assert(data.tag == LITERAL_STRING);
 }
 
 void test_repeat(void) {
-  char *src = "42 + $foo()";
-  OoError err;
+  char *src = " 42 + $foo() ";
+  ParserError err;
   AsgRepeat data;
 
-  assert(parse_repeat(src, &err, &data) == strlen(src));
+  assert(parse_repeat(src, &err, &data) == strlen(src) - 1);
   assert(err.tag == ERR_NONE);
   assert(data.tag == REPEAT_BIN_OP);
-  assert(data.len == strlen(src));
+  assert(data.src == src + 1);
+  assert(data.len == strlen(src) - 2);
   assert(data.bin_op.lhs->tag == REPEAT_INT);
   assert(data.bin_op.lhs->len == 2);
   assert(data.bin_op.rhs->tag == REPEAT_MACRO);
-  assert(data.bin_op.rhs->macro.name == src + 6);
+  assert(data.bin_op.rhs->macro.name == src + 7);
   assert(data.bin_op.rhs->macro.name_len == 3);
-
   free_inner_repeat(data);
 }
 
 void test_type(void) {
-  char *src = "abc::def";
-  OoError err;
+  char *src = " abc::def";
+  ParserError err;
   AsgType data;
 
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(data.tag == TYPE_ID);
   assert(sb_count(data.id.sids) == 2);
   free_inner_type(data);
 
-  src = "$foo()";
+  src = " $foo()";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_MACRO);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   free_inner_type(data);
 
-  src = "@a";
+  src = " @ a";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_PTR);
-  assert(data.len == strlen(src));
-  assert(data.ptr->src == src + 1);
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
+  assert(data.ptr->src == src + 3);
   assert(data.ptr->len == 1);
   assert(data.ptr->tag == TYPE_ID);
   free_inner_type(data);
 
-  src = "~@a";
+  src = " ~ @ a";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_PTR_MUT);
-  assert(data.len == strlen(src));
-  assert(data.ptr_mut->src == src + 1);
-  assert(data.ptr_mut->len == 2);
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
+  assert(data.ptr_mut->src == src + 3);
+  assert(data.ptr_mut->len == 3);
   assert(data.ptr_mut->tag == TYPE_PTR);
   free_inner_type(data);
 
-  src = "[@a]";
+  src = " [ @ a ]";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_ARRAY);
-  assert(data.len == strlen(src));
-  assert(data.array->src == src + 1);
-  assert(data.array->len == 2);
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
+  assert(data.array->src == src + 3);
+  assert(data.array->len == 3);
   assert(data.array->tag == TYPE_PTR);
   free_inner_type(data);
 
-  src = "(@A; 42)";
+  src = " ( @ A ; 42 )";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_PRODUCT_REPEATED);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(data.product_repeated.inner->tag == TYPE_PTR);
-  assert(data.product_repeated.inner->src == src + 1);
-  assert(data.product_repeated.inner->len == 2);
+  assert(data.product_repeated.inner->src == src + 3);
+  assert(data.product_repeated.inner->len == 3);
   assert(data.product_repeated.repeat.tag == REPEAT_INT);
   free_inner_type(data);
 
-  src = "( )";
+  src = " ( )";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_PRODUCT_ANON);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.product_anon) == 0);
   free_inner_type(data);
 
-  src = "(A)";
+  src = " ( A )";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_PRODUCT_ANON);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.product_anon) == 1);
   assert(data.product_anon[0].tag == TYPE_ID);
-  assert(data.product_anon[0].src == src + 1);
+  assert(data.product_anon[0].src == src + 3);
   assert(data.product_anon[0].len == 1);
   free_inner_type(data);
 
-  src = "(A, @B)";
+  src = " ( A , @ B )";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_PRODUCT_ANON);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.product_anon) == 2);
   assert(data.product_anon[0].tag == TYPE_ID);
-  assert(data.product_anon[0].src == src + 1);
+  assert(data.product_anon[0].src == src + 3);
   assert(data.product_anon[0].len == 1);
   assert(data.product_anon[1].tag == TYPE_PTR);
-  assert(data.product_anon[1].src == src + 4);
+  assert(data.product_anon[1].src == src + 7);
   assert(data.product_anon[1].len == 3);
   free_inner_type(data);
 
-  src = "() -> @A";
+  src = " ( ) -> @ A";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_FUN_ANON);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.fun_anon.args) == 0);
   assert(data.fun_anon.ret->tag == TYPE_PTR);
-  assert(data.fun_anon.ret->src == src + 6);
+  assert(data.fun_anon.ret->src == src + 8);
   assert(data.fun_anon.ret->len == 3);
   free_inner_type(data);
 
-  src = "(@A) -> ()";
+  src = " ( @ A ) -> ()";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_FUN_ANON);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.fun_anon.args) == 1);
   assert(data.fun_anon.args[0].tag == TYPE_PTR);
-  assert(data.fun_anon.args[0].src == src + 1);
-  assert(data.fun_anon.args[0].len == 2);
+  assert(data.fun_anon.args[0].src == src + 3);
+  assert(data.fun_anon.args[0].len == 3);
   assert(data.fun_anon.ret->tag == TYPE_PRODUCT_ANON);
   assert(sb_count(data.fun_anon.ret->product_anon) == 0);
   free_inner_type(data);
 
-  src = "(a: A)";
+  src = " ( a : A )";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_PRODUCT_NAMED);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.product_named.types) == 1);
   assert(data.product_named.types[0].tag == TYPE_ID);
-  assert(data.product_named.types[0].src == src + 4);
-  assert(data.product_named.types[0].len == 2);
+  assert(data.product_named.types[0].src == src + 7);
+  assert(data.product_named.types[0].len == 1);
   assert(sb_count(data.product_named.sids) == 1);
-  assert(data.product_named.sids[0].src == src + 1);
+  assert(data.product_named.sids[0].src == src + 3);
   assert(data.product_named.sids[0].len == 1);
   free_inner_type(data);
 
-  src = "(a: A, b: @B)";
+  src = " ( a : A , b : @ B )";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_PRODUCT_NAMED);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.product_named.types) == 2);
   assert(data.product_named.types[0].tag == TYPE_ID);
-  assert(data.product_named.types[0].src == src + 4);
-  assert(data.product_named.types[0].len == 2);
+  assert(data.product_named.types[0].src == src + 7);
+  assert(data.product_named.types[0].len == 1);
   assert(data.product_named.types[1].tag == TYPE_PTR);
-  assert(data.product_named.types[1].src == src + 10);
+  assert(data.product_named.types[1].src == src + 15);
   assert(data.product_named.types[1].len == 3);
   assert(sb_count(data.product_named.sids) == 2);
-  assert(data.product_named.sids[0].src == src + 1);
+  assert(data.product_named.sids[0].src == src + 3);
   assert(data.product_named.sids[0].len == 1);
-  assert(data.product_named.sids[1].src == src + 7);
+  assert(data.product_named.sids[1].src == src + 11);
   assert(data.product_named.sids[1].len == 1);
   free_inner_type(data);
 
-  src = "(a: @A) -> @A";
+  src = " ( a : @ A ) -> @ A";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_FUN_NAMED);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.fun_named.arg_types) == 1);
   assert(data.fun_named.arg_types[0].tag == TYPE_PTR);
-  assert(data.fun_named.arg_types[0].src == src + 4);
+  assert(data.fun_named.arg_types[0].src == src + 7);
   assert(data.fun_named.arg_types[0].len == 3);
   assert(data.fun_named.ret->tag == TYPE_PTR);
   assert(data.fun_named.ret->len == 3);
   free_inner_type(data);
 
-  src = "a<A>";
+  src = " a < A >";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_APP_ANON);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.app_anon.tlf.sids) == 1);
   assert(sb_count(data.app_anon.args) == 1);
   assert(data.app_anon.args[0].tag == TYPE_ID);
-  assert(data.app_anon.args[0].src == src + 2);
+  assert(data.app_anon.args[0].src == src + 5);
   assert(data.app_anon.args[0].len == 1);
   free_inner_type(data);
 
-  src = "a<A, @B>";
+  src = " a < A , @ B >";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_APP_ANON);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.app_anon.tlf.sids) == 1);
   assert(sb_count(data.app_anon.args) == 2);
   assert(data.app_anon.args[0].tag == TYPE_ID);
-  assert(data.app_anon.args[0].src == src + 2);
+  assert(data.app_anon.args[0].src == src + 5);
   assert(data.app_anon.args[0].len == 1);
   assert(data.app_anon.args[1].tag == TYPE_PTR);
-  assert(data.app_anon.args[1].src == src + 5);
+  assert(data.app_anon.args[1].src == src + 9);
   assert(data.app_anon.args[1].len == 3);
   free_inner_type(data);
 
-  src = "a<a = A>";
+  src = " a < a = A >";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_APP_NAMED);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.app_named.tlf.sids) == 1);
   assert(sb_count(data.app_named.types) == 1);
   assert(data.app_named.types[0].tag == TYPE_ID);
-  assert(data.app_named.types[0].src == src + 6);
-  assert(data.app_named.types[0].len == 2);
+  assert(data.app_named.types[0].src == src + 9);
+  assert(data.app_named.types[0].len == 1);
   assert(sb_count(data.app_named.sids) == 1);
-  assert(data.app_named.sids[0].src == src + 2);
+  assert(data.app_named.sids[0].src == src + 5);
   assert(data.app_named.sids[0].len == 1);
   free_inner_type(data);
 
-  src = "a<a = A, b = @B>";
+  src = " a < a = A , b = @ B >";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_APP_NAMED);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.app_named.tlf.sids) == 1);
   assert(sb_count(data.app_named.types) == 2);
   assert(data.app_named.types[0].tag == TYPE_ID);
-  assert(data.app_named.types[0].src == src + 6);
-  assert(data.app_named.types[0].len == 2);
+  assert(data.app_named.types[0].src == src + 9);
+  assert(data.app_named.types[0].len == 1);
   assert(data.app_named.types[1].tag == TYPE_PTR);
-  assert(data.app_named.types[1].src == src + 13);
+  assert(data.app_named.types[1].src == src + 17);
   assert(data.app_named.types[1].len == 3);
   assert(sb_count(data.app_named.sids) == 2);
-  assert(data.app_named.sids[0].src == src + 2);
+  assert(data.app_named.sids[0].src == src + 5);
   assert(data.app_named.sids[0].len == 1);
-  assert(data.app_named.sids[1].src == src + 9);
+  assert(data.app_named.sids[1].src == src + 13);
   assert(data.app_named.sids[1].len == 1);
   free_inner_type(data);
 
-  src = "<A> => @A";
+  src = " < A > => @ A";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_GENERIC);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.generic.args) == 1);
-  assert(data.generic.args[0].src == src + 1);
+  assert(data.generic.args[0].src == src + 3);
   assert(data.generic.inner->tag == TYPE_PTR);
   assert(data.generic.inner->len == 3);
   free_inner_type(data);
 
-  src = "<A, B> => @A";
+  src = " < A , B > => @ A";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_GENERIC);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(sb_count(data.generic.args) == 2);
-  assert(data.generic.args[0].src == src + 1);
-  assert(data.generic.args[1].src == src + 4);
+  assert(data.generic.args[0].src == src + 3);
+  assert(data.generic.args[1].src == src + 7);
   assert(data.generic.inner->tag == TYPE_PTR);
   assert(data.generic.inner->len == 3);
   free_inner_type(data);
 
-  src = "| A";
+  src = " | A";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_SUM);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(!data.sum.pub);
   assert(sb_count(data.sum.summands) == 1);
+  assert(data.sum.summands[0].src == src + 1);
+  assert(data.sum.summands[0].len == 3);
   assert(data.sum.summands[0].tag == SUMMAND_ANON);
-  assert(data.sum.summands[0].sid.src == src + 2);
+  assert(data.sum.summands[0].sid.src == src + 3);
   assert(data.sum.summands[0].sid.len == 1);
   assert(sb_count(data.sum.summands[0].anon) == 0);
   free_inner_type(data);
 
-  src = "pub | A(@A) | B(b: @Z)";
+  src = " pub | A ( @ A ) | B ( b : @ Z )";
   assert(parse_type(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.tag == TYPE_SUM);
-  assert(data.len == strlen(src));
+  assert(data.len == strlen(src) - 1);
+  assert(data.src == src + 1);
   assert(data.sum.pub);
   assert(sb_count(data.sum.summands) == 2);
+  assert(data.sum.summands[0].src == src + 5);
+  assert(data.sum.summands[0].len == 11);
   assert(data.sum.summands[0].tag == SUMMAND_ANON);
-  assert(data.sum.summands[0].sid.src == src + 6);
+  assert(data.sum.summands[0].sid.src == src + 7);
   assert(data.sum.summands[0].sid.len == 1);
   assert(sb_count(data.sum.summands[0].anon) == 1);
   assert(data.sum.summands[0].anon[0].tag == TYPE_PTR);
-  assert(data.sum.summands[0].anon[0].src == src + 8);
-  assert(data.sum.summands[0].anon[0].len == 2);
+  assert(data.sum.summands[0].anon[0].src == src + 11);
+  assert(data.sum.summands[0].anon[0].len == 3);
+  assert(data.sum.summands[1].src == src + 17);
+  assert(data.sum.summands[1].len == 15);
   assert(data.sum.summands[1].tag == SUMMAND_NAMED);
-  assert(data.sum.summands[1].sid.src == src + 14);
+  assert(data.sum.summands[1].sid.src == src + 19);
   assert(data.sum.summands[1].sid.len == 1);
   assert(sb_count(data.sum.summands[1].named.inners) == 1);
   assert(sb_count(data.sum.summands[1].named.sids) == 1);
   assert(data.sum.summands[1].named.inners[0].tag == TYPE_PTR);
-  assert(data.sum.summands[1].named.inners[0].src == src + 19);
+  assert(data.sum.summands[1].named.inners[0].src == src + 27);
   assert(data.sum.summands[1].named.inners[0].len == 3);
-  assert(data.sum.summands[1].named.sids[0].src == src + 16);
+  assert(data.sum.summands[1].named.sids[0].src == src + 23);
   assert(data.sum.summands[1].named.sids[0].len == 1);
   free_inner_type(data);
 }
 
 void test_pattern(void) {
   char *src = "_";
-  OoError err;
+  ParserError err;
   AsgPattern data;
 
   assert(parse_pattern(src, &err, &data) == strlen(src));
@@ -571,7 +603,7 @@ void test_pattern(void) {
 
 void test_exp(void) {
   char *src = "abc::def";
-  OoError err;
+  ParserError err;
   AsgExp data;
 
   assert(parse_exp(src, &err, &data) == strlen(src));
@@ -1169,7 +1201,7 @@ void test_exp(void) {
 
 void test_meta(void) {
   char *src = "  foo";
-  OoError err;
+  ParserError err;
   AsgMeta data;
 
   assert(parse_meta(src, &err, &data) == strlen(src));
@@ -1214,7 +1246,7 @@ void test_meta(void) {
 
 void test_use_tree(void) {
   char *src = "a";
-  OoError err;
+  ParserError err;
   AsgUseTree data;
 
   assert(parse_use_tree(src, &err, &data) == strlen(src));
@@ -1270,7 +1302,7 @@ void test_use_tree(void) {
 
 void test_item(void) {
   char *src = "pub use a::b";
-  OoError err;
+  ParserError err;
   AsgItem data;
 
   assert(parse_item(src, &err, &data) == strlen(src));
@@ -1400,7 +1432,7 @@ void test_item(void) {
 
 void test_file(void) {
   char *src = "type a = b";
-  OoError err;
+  ParserError err;
   AsgFile data;
 
   assert(parse_file(src, &err, &data) == strlen(src));

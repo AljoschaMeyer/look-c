@@ -8,7 +8,7 @@
 
 void test_cc(void) {
   char *src = "#[cc = \"foo\"]type a = b #[cc = \"bar\"]fn c = () {#[cc = \"bar\"]a; #[cc = \"baz\"]b}";
-  OoError err;
+  ParserError err;
   AsgFile data;
 
   assert(parse_file(src, &err, &data) == strlen(src));
@@ -25,7 +25,7 @@ void test_cc(void) {
   assert(sb_count(data.items[1].fun.body.attrs[1]) == 1);
 
   rax *features = raxNew();
-  raxInsert(features, (unsigned char*) "bar", 3, NULL, NULL);
+  raxInsert(features, "bar", 3, NULL, NULL);
   oo_filter_cc(&data, features);
 
   assert(data.len == strlen(src));

@@ -13,7 +13,7 @@ static bool should_stay(AsgMeta *attrs, rax *features) {
   for (i = 0; i < count; i++) {
     if (attrs[i].tag == META_UNARY && attrs[i].name_len == 2 && strncmp(attrs[i].name, "cc", 2) == 0) {
       if (attrs[i].unary.tag == LITERAL_STRING &&
-        raxFind(features, (unsigned char*) attrs[i].unary.src + 1, attrs[i].unary.len - 2) == raxNotFound) {
+        raxFind(features, attrs[i].unary.src + 1, attrs[i].unary.len - 2) == raxNotFound) {
         return false;
       }
     }

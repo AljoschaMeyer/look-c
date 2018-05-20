@@ -97,7 +97,7 @@ typedef struct raxNode {
      * childen, an additional value pointer is present (as you can see
      * in the representation above as "value-ptr" field).
      */
-    unsigned char data[];
+    char data[];
 } raxNode;
 
 typedef struct rax {
@@ -130,11 +130,11 @@ typedef struct raxStack {
 typedef struct raxIterator {
     int flags;
     rax *rt;                /* Radix tree we are iterating. */
-    unsigned char *key;     /* The current string. */
+    char *key;     /* The current string. */
     void *data;             /* Data associated to this key. */
     size_t key_len;         /* Current key length. */
     size_t key_max;         /* Max key len the current key buffer can hold. */
-    unsigned char key_static_string[RAX_ITER_STATIC_LEN];
+    char key_static_string[RAX_ITER_STATIC_LEN];
     raxNode *node;          /* Current node. Only for unsafe iteration. */
     raxStack stack;         /* Stack used for unsafe iteration. */
 } raxIterator;
@@ -144,17 +144,17 @@ extern void *raxNotFound;
 
 /* Exported API. */
 rax *raxNew(void);
-int raxInsert(rax *rax, unsigned char *s, size_t len, void *data, void **old);
-int raxRemove(rax *rax, unsigned char *s, size_t len, void **old);
-void *raxFind(rax *rax, const unsigned char *s, size_t len);
+int raxInsert(rax *rax, const char *s, size_t len, void *data, void **old);
+int raxRemove(rax *rax, const char *s, size_t len, void **old);
+void *raxFind(rax *rax, const char *s, size_t len);
 void raxFree(rax *rax);
 void raxFreeWithCallback(rax *rax, void (*free_callback)(void*));
 void raxStart(raxIterator *it, rax *rt);
-int raxSeek(raxIterator *it, const char *op, unsigned char *ele, size_t len);
+int raxSeek(raxIterator *it, const char *op, char *ele, size_t len);
 int raxNext(raxIterator *it);
 int raxPrev(raxIterator *it);
 int raxRandomWalk(raxIterator *it, size_t steps);
-int raxCompare(raxIterator *iter, const char *op, unsigned char *key, size_t key_len);
+int raxCompare(raxIterator *iter, const char *op, char *key, size_t key_len);
 void raxStop(raxIterator *it);
 int raxEOF(raxIterator *it);
 void raxShow(rax *rax);
