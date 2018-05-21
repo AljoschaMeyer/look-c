@@ -6,43 +6,42 @@
 /// Optional pointers are efficiently represented as null pointers in memory,
 /// thus `sizeof(@T) == sizeof(Option<@T>)`.
 
-// /// Type for optional values: either the is `some` value of type `T`, or there
-// /// is `none`.
-// pub type Option = <T> => pub
-//     /// Some value of type `T` is present.
-//     | some(T)
-//     /// No value is present.
-//     | none
+/// Type for optional values: either the is `some` value of type `T`, or there
+/// is `none`.
+pub type Option = <T> => pub
+    /// Some value of type `T` is present.
+    | some(T)
+    /// No value is present.
+    | none
 
-// #[test_pure]
-// fn null_pointer_optimization = () {
-//   assert(sizeof(@Usize) == sizeof(Option<@Usize>))
-// }
-//
-// /// Returns whether `opt` is a `some`.
-// ///
-// /// This returns `true` iff `is_none` returns `false`.
-// pub fn is_some = <T> => (opt: @Option<T>) -> Bool {
-//     case opt {
-//         @|some(_) { true }
-//         @|none { false }
-//     }
-// }
+#[test_pure]
+fn null_pointer_optimization = () {
+  assert(sizeof(@Usize) == sizeof(Option<@Usize>))
+}
 
-// /// Returns whether `opt` is a `none`.
-// ///
-// /// This returns `true` iff `is_some` returns `false`.
-// pub fn is_none = <T> => (opt: @Option<T>) -> Bool {
-//     case opt {
-//         @|some(_) { false }
-//         @|none { true }
-//     }
-// }
+/// Returns whether `opt` is a `some`.
+///
+/// This returns `true` iff `is_none` returns `false`.
+pub fn is_some = <T> => (opt: @Option<T>) -> Bool {
+    case opt {
+        @|some(_) { true }
+        @|none { false }
+    }
+}
+
+/// Returns whether `opt` is a `none`.
+///
+/// This returns `true` iff `is_some` returns `false`.
+pub fn is_none = <T> => (opt: @Option<T>) -> Bool {
+    case opt {
+        @|some(_) { false }
+        @|none { true }
+    }
+}
 
 #[test_pure]
 fn is_some_iff_not_is_none = (x: Option<Usize>) {
     assert(is_some(x) == !is_none(x))
-    // a(b(c) == !d(e))
 }
 
 // Prior art:

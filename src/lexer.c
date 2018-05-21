@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "lexer.h"
+#include "util.h"
 
 const char * token_type_error(TokenType tt) {
   if (tt == ERR_BEGIN_ATTRIBUTE) {
@@ -313,51 +314,51 @@ Token tokenize(const char *src) {
         if (!is_id_char(c)) {
           len -= 1;
 
-          if (strncmp(src + token_start, "use", 3) == 0) {
+          if (str_eq(src + token_start, len - token_start, "use", 3)) {
             tt = USE;
-          } else if (strncmp(src + token_start, "mod", 3) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "mod", 3)) {
             tt = KW_MOD;
-          } else if (strncmp(src + token_start, "dep", 3) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "dep", 3)) {
             tt = DEP;
-          } else if (strncmp(src + token_start, "magic", 5) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "magic", 5)) {
             tt = MAGIC;
-          } else if (strncmp(src + token_start, "goto", 4) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "goto", 4)) {
             tt = GOTO;
-          } else if (strncmp(src + token_start, "label", 5) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "label", 5)) {
             tt = LABEL;
-          } else if (strncmp(src + token_start, "break", 5) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "break", 5)) {
             tt = BREAK;
-          } else if (strncmp(src + token_start, "return", 6) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "return", 6)) {
             tt = RETURN;
-          } else if (strncmp(src + token_start, "if", 2) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "if", 2)) {
             tt = IF;
-          } else if (strncmp(src + token_start, "else", 4) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "else", 4)) {
             tt = ELSE;
-          } else if (strncmp(src + token_start, "while", 5) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "while", 5)) {
             tt = WHILE;
-          } else if (strncmp(src + token_start, "loop", 4) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "loop", 4)) {
             tt = LOOP;
-          } else if (strncmp(src + token_start, "case", 4) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "case", 4)) {
             tt = CASE;
-          } else if (strncmp(src + token_start, "as", 2) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "as", 2)) {
             tt = AS;
-          } else if (strncmp(src + token_start, "val", 3) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "val", 3)) {
             tt = VAL;
-          } else if (strncmp(src + token_start, "fn", 2) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "fn", 2)) {
             tt = FN;
-          } else if (strncmp(src + token_start, "type", 4) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "type", 4)) {
             tt = TYPE;
-          } else if (strncmp(src + token_start, "macro", 5) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "macro", 5)) {
             tt = MACRO;
-          } else if (strncmp(src + token_start, "mut", 3) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "mut", 3)) {
             tt = MUT;
-          } else if (strncmp(src + token_start, "pub", 3) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "pub", 3)) {
             tt = PUB;
-          } else if (strncmp(src + token_start, "ffi", 3) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "ffi", 3)) {
             tt = FFI;
-          } else if (strncmp(src + token_start, "sizeof", 6) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "sizeof", 6)) {
             tt = SIZEOF;
-          } else if (strncmp(src + token_start, "alignof", 7) == 0) {
+          } else if (str_eq(src + token_start, len - token_start, "alignof", 7)) {
             tt = ALIGNOF;
           }
 
