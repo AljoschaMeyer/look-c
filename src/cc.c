@@ -2,9 +2,8 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "asg.h"
+#include "cc.h"
 #include "parser.h"
-#include "rax.h"
 #include "stretchy_buffer.h"
 
 static bool should_stay(AsgMeta *attrs, rax *features) {

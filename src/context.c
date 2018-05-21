@@ -4,6 +4,7 @@
 #include "context.h"
 #include "parser.h"
 #include "rax.h"
+#include "cc.h"
 
 AsgFile *oo_get_file(OoContext *cx, OoError *err, const char *path, size_t path_len) {
   char *src = NULL;
