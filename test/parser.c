@@ -48,6 +48,45 @@ void test_id() {
   assert(data.sids[2].src == src + 14);
   assert(data.sids[2].len == 3);
   free_inner_id(data);
+
+  src = " mod :: a";
+  l = parse_id(src, &err, &data);
+  assert(err.tag == ERR_NONE);
+  assert(l == strlen(src));
+  assert(data.src == src + 1);
+  assert(data.len == strlen(src) - 1);
+  assert(sb_count(data.sids) == 2);
+  assert(data.sids[0].src == src + 1);
+  assert(data.sids[0].len == 3);
+  assert(data.sids[1].src == src + 8);
+  assert(data.sids[1].len == 1);
+  free_inner_id(data);
+
+  src = " dep :: a";
+  l = parse_id(src, &err, &data);
+  assert(err.tag == ERR_NONE);
+  assert(l == strlen(src));
+  assert(data.src == src + 1);
+  assert(data.len == strlen(src) - 1);
+  assert(sb_count(data.sids) == 2);
+  assert(data.sids[0].src == src + 1);
+  assert(data.sids[0].len == 3);
+  assert(data.sids[1].src == src + 8);
+  assert(data.sids[1].len == 1);
+  free_inner_id(data);
+
+  src = " magic :: a";
+  l = parse_id(src, &err, &data);
+  assert(err.tag == ERR_NONE);
+  assert(l == strlen(src));
+  assert(data.src == src + 1);
+  assert(data.len == strlen(src) - 1);
+  assert(sb_count(data.sids) == 2);
+  assert(data.sids[0].src == src + 1);
+  assert(data.sids[0].len == 5);
+  assert(data.sids[1].src == src + 10);
+  assert(data.sids[1].len == 1);
+  free_inner_id(data);
 }
 
 void test_macro_inv() {

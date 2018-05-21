@@ -15,11 +15,25 @@ size_t parse_id(const char *src, ParserError *err, AsgId *data) {
   err->tag = ERR_NONE;
   data->sids = NULL;
   AsgSid *sid = sb_add(data->sids, 1);
+  bool kw = false;
+  size_t l;
 
-  size_t l = parse_sid(src, err, sid);
-  if (err->tag != ERR_NONE) {
-    sb_free(data->sids);
-    return l;
+  switch (t.tt) {
+    case KW_MOD:
+    case DEP:
+    case MAGIC:
+      kw = true;
+      sid->src = data->src;
+      sid->len = t.token_len;
+      l = t.len;
+      break;
+    default:
+      l = parse_sid(src, err, sid);
+      if (err->tag != ERR_NONE) {
+        sb_free(data->sids);
+        return l;
+      }
+      break;
   }
 
   t = tokenize(src + l);
@@ -36,6 +50,12 @@ size_t parse_id(const char *src, ParserError *err, AsgId *data) {
     l += t.len;
   }
   l -= t.len;
+
+  if (kw && sb_count(data->sids) == 1) {
+    sb_free(data->sids);
+    err->tag = ERR_ID;
+    return l;
+  }
 
   data->len = l - leading_ws;
   return l;

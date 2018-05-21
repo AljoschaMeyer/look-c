@@ -45,13 +45,9 @@ AsgFile *oo_get_file(OoContext *cx, OoError *err, const char *path, size_t path_
       return NULL;
     }
 
+    oo_filter_cc(asg, cx->features);
+
     raxInsert(cx->files, path, path_len, asg, NULL);
-
-
-
-    // TODO conditional compilation
-
-    // TODO
 
     err->tag = OO_ERR_NONE;
     return asg;
@@ -70,6 +66,3 @@ void oo_context_free(OoContext *cx) {
   raxFree(cx->features);
   raxFree(cx->files);
 }
-
-// fwrite(path, sizeof(char), path_len, stdout);
-// printf("\n");
