@@ -1,0 +1,2 @@
+pub type a = b
+type a = c

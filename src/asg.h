@@ -120,7 +120,11 @@ typedef struct AsgFile {
   Str str;
   AsgItem *items; // stretchy buffer
   AsgMeta **attrs; // stretchy buffer of stretchy buffers, same length as items
-  // rax *items_by_id; // stores `AsgItem`s TODO remove this, keep analysis separate?
+  // The below raxes store pointers to AsgItems, which may reside in another
+  // AsgFile, if they were brought into scope via a use.
+  rax *items_by_sid; // map from Strs to all named items, NULL if !did_init_items_by_sid
+  rax *pub_items_by_sid; // map from Strs to only the public named items, NULL if !did_init_items_by_sid
+  bool did_init_items_by_sid; // whether the (pub_)items_by_sid maps have been initialized
 } AsgFile;
 
 // Filters out all items and expressions with cc (conditional compilation)

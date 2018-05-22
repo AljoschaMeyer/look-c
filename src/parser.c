@@ -1,11 +1,11 @@
 #include <stdlib.h>
-#include <stdio.h> // TODO remove this after printf debugging
 #include <string.h>
 
 #include "lexer.h"
 #include "parser.h"
 #include "asg.h"
 #include "stretchy_buffer.h"
+#include "rax.h"
 
 size_t parse_id(const char *src, ParserError *err, AsgId *data) {
   Token t = tokenize(src);
@@ -3455,10 +3455,18 @@ size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
   data->str.len = l;
   data->items = items;
   data->attrs = all_attrs;
+  data->items_by_sid = NULL;
+  data->pub_items_by_sid = NULL;
+  data->did_init_items_by_sid = false;
   return l;
 }
 
 void free_inner_file(AsgFile data) {
   free_sb_items(data.items);
   free_sb_sb_meta(data.attrs);
+
+  if (data.did_init_items_by_sid) {
+    raxFree(data.items_by_sid);
+    raxFree(data.pub_items_by_sid);
+  }
 }

@@ -23,7 +23,7 @@ build $builddir/test/lexer: ld $builddir/test/lexer.o $builddir/lexer.o $builddi
 
 build $builddir/parser.o: cc src/parser.c
 build $builddir/test/parser.o: cc test/parser.c
-build $builddir/test/parser: ld $builddir/test/parser.o $builddir/parser.o $builddir/lexer.o $builddir/util.o
+build $builddir/test/parser: ld $builddir/test/parser.o $builddir/parser.o $builddir/lexer.o $builddir/util.o $builddir/rax.o
 
 build $builddir/cc.o: cc src/cc.c
 build $builddir/test/cc.o: cc test/cc.c
@@ -33,7 +33,12 @@ build $builddir/context.o: cc src/context.c
 build $builddir/test/context.o: cc test/context.c
 build $builddir/test/context: ld $builddir/test/context.o $builddir/context.o $builddir/parser.o $builddir/lexer.o $builddir/rax.o $builddir/cc.o $builddir/util.o
 
+build $builddir/analyze.o: cc src/analyze.c
+build $builddir/test/analyze.o: cc test/analyze.c
+build $builddir/test/analyze: ld $builddir/test/analyze.o $builddir/analyze.o $builddir/context.o $builddir/parser.o $builddir/lexer.o $builddir/rax.o $builddir/cc.o $builddir/util.o
+
 build test_lexer: test $builddir/test/lexer
 build test_parser: test $builddir/test/parser
 build test_cc: test $builddir/test/cc
 build test_context: test $builddir/test/context
+build test_analyze: test $builddir/test/analyze

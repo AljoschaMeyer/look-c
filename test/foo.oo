@@ -1,0 +1,3 @@
+pub type a = b
+
+val c = d
