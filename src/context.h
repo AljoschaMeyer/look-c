@@ -4,6 +4,7 @@
 #include "asg.h"
 #include "parser.h"
 #include "rax.h"
+#include "util.h"
 
 typedef enum {
   OO_ERR_NONE, OO_ERR_SYNTAX, OO_ERR_FILE
@@ -35,6 +36,11 @@ typedef struct OoContext {
 //
 // `path` is the path of the file on the file system, and must be null-terminated
 AsgFile *oo_get_file(OoContext *cx, OoError *err, const char *path, size_t path_len);
+
+// Delegates to oo_get_file, converting the given stretchy buffer of identifiers
+// to a path. The entry in the stretchy buffer must be "dep" or "mod" for this
+// to work (errors otherwise).
+AsgFile *oo_get_file_ids(OoContext *cx, OoError *err, Str *ids /* stretchy buffer */);
 
 // Frees the features and files raxes, but not their content.
 void oo_context_free(OoContext *cx);

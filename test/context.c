@@ -27,7 +27,7 @@ void test_read_file(void) {
 
   oo_context_free(&cx);
   free_inner_file(*asg);
-  free((void *) asg->src);
+  free((void *) asg->str.start);
   free(asg);
 }
 

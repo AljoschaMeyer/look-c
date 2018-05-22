@@ -10,9 +10,9 @@ static bool should_stay(AsgMeta *attrs, rax *features) {
   int i;
   int count = sb_count(attrs);
   for (i = 0; i < count; i++) {
-    if (attrs[i].tag == META_UNARY && attrs[i].name_len == 2 && strncmp(attrs[i].name, "cc", 2) == 0) {
+    if (attrs[i].tag == META_UNARY && str_eq_parts(attrs[i].name, "cc", 2)) {
       if (attrs[i].unary.tag == LITERAL_STRING &&
-        raxFind(features, attrs[i].unary.src + 1, attrs[i].unary.len - 2) == raxNotFound) {
+        raxFind(features, attrs[i].unary.str.start + 1, attrs[i].unary.str.len - 2) == raxNotFound) {
         return false;
       }
     }

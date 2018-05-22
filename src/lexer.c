@@ -313,52 +313,147 @@ Token tokenize(const char *src) {
       case S_ID:
         if (!is_id_char(c)) {
           len -= 1;
+          Str s;
+          s.start = src + token_start;
+          s.len = len - token_start;
 
-          if (str_eq(src + token_start, len - token_start, "use", 3)) {
+          Str s_use;
+          s_use.start = "use";
+          s_use.len = 3;
+
+          Str s_mod;
+          s_mod.start = "mod";
+          s_mod.len = 3;
+
+          Str s_dep;
+          s_dep.start = "dep";
+          s_dep.len = 3;
+
+          Str s_magic;
+          s_magic.start = "magic";
+          s_magic.len = 5;
+
+          Str s_goto;
+          s_goto.start = "goto";
+          s_goto.len = 4;
+
+          Str s_label;
+          s_label.start = "label";
+          s_label.len = 5;
+
+          Str s_break;
+          s_break.start = "break";
+          s_break.len = 5;
+
+          Str s_return;
+          s_return.start = "return";
+          s_return.len = 6;
+
+          Str s_if;
+          s_if.start = "if";
+          s_if.len = 2;
+
+          Str s_else;
+          s_else.start = "else";
+          s_else.len = 4;
+
+          Str s_while;
+          s_while.start = "while";
+          s_while.len = 5;
+
+          Str s_loop;
+          s_loop.start = "loop";
+          s_loop.len = 4;
+
+          Str s_case;
+          s_case.start = "case";
+          s_case.len = 4;
+
+          Str s_as;
+          s_as.start = "as";
+          s_as.len = 2;
+
+          Str s_val;
+          s_val.start = "val";
+          s_val.len = 3;
+
+          Str s_fn;
+          s_fn.start = "fn";
+          s_fn.len = 2;
+
+          Str s_type;
+          s_type.start = "type";
+          s_type.len = 4;
+
+          Str s_macro;
+          s_macro.start = "macro";
+          s_macro.len = 5;
+
+          Str s_mut;
+          s_mut.start = "mut";
+          s_mut.len = 3;
+
+          Str s_pub;
+          s_pub.start = "pub";
+          s_pub.len = 3;
+
+          Str s_ffi;
+          s_ffi.start = "ffi";
+          s_ffi.len = 3;
+
+          Str s_size_of;
+          s_size_of.start = "sizeof";
+          s_size_of.len = 6;
+
+          Str s_align_of;
+          s_align_of.start = "alignof";
+          s_align_of.len = 7;
+
+          if (str_eq(s, s_use)) {
             tt = USE;
-          } else if (str_eq(src + token_start, len - token_start, "mod", 3)) {
+          } else if (str_eq(s, s_mod)) {
             tt = KW_MOD;
-          } else if (str_eq(src + token_start, len - token_start, "dep", 3)) {
+          } else if (str_eq(s, s_dep)) {
             tt = DEP;
-          } else if (str_eq(src + token_start, len - token_start, "magic", 5)) {
+          } else if (str_eq(s, s_magic)) {
             tt = MAGIC;
-          } else if (str_eq(src + token_start, len - token_start, "goto", 4)) {
+          } else if (str_eq(s, s_goto)) {
             tt = GOTO;
-          } else if (str_eq(src + token_start, len - token_start, "label", 5)) {
+          } else if (str_eq(s, s_label)) {
             tt = LABEL;
-          } else if (str_eq(src + token_start, len - token_start, "break", 5)) {
+          } else if (str_eq(s, s_break)) {
             tt = BREAK;
-          } else if (str_eq(src + token_start, len - token_start, "return", 6)) {
+          } else if (str_eq(s, s_return)) {
             tt = RETURN;
-          } else if (str_eq(src + token_start, len - token_start, "if", 2)) {
+          } else if (str_eq(s, s_if)) {
             tt = IF;
-          } else if (str_eq(src + token_start, len - token_start, "else", 4)) {
+          } else if (str_eq(s, s_else)) {
             tt = ELSE;
-          } else if (str_eq(src + token_start, len - token_start, "while", 5)) {
+          } else if (str_eq(s, s_while)) {
             tt = WHILE;
-          } else if (str_eq(src + token_start, len - token_start, "loop", 4)) {
+          } else if (str_eq(s, s_loop)) {
             tt = LOOP;
-          } else if (str_eq(src + token_start, len - token_start, "case", 4)) {
+          } else if (str_eq(s, s_case)) {
             tt = CASE;
-          } else if (str_eq(src + token_start, len - token_start, "as", 2)) {
+          } else if (str_eq(s, s_as)) {
             tt = AS;
-          } else if (str_eq(src + token_start, len - token_start, "val", 3)) {
+          } else if (str_eq(s, s_val)) {
             tt = VAL;
-          } else if (str_eq(src + token_start, len - token_start, "fn", 2)) {
+          } else if (str_eq(s, s_fn)) {
             tt = FN;
-          } else if (str_eq(src + token_start, len - token_start, "type", 4)) {
+          } else if (str_eq(s, s_type)) {
             tt = TYPE;
-          } else if (str_eq(src + token_start, len - token_start, "macro", 5)) {
+          } else if (str_eq(s, s_macro)) {
             tt = MACRO;
-          } else if (str_eq(src + token_start, len - token_start, "mut", 3)) {
+          } else if (str_eq(s, s_mut)) {
             tt = MUT;
-          } else if (str_eq(src + token_start, len - token_start, "pub", 3)) {
+          } else if (str_eq(s, s_pub)) {
             tt = PUB;
-          } else if (str_eq(src + token_start, len - token_start, "ffi", 3)) {
+          } else if (str_eq(s, s_ffi)) {
             tt = FFI;
-          } else if (str_eq(src + token_start, len - token_start, "sizeof", 6)) {
+          } else if (str_eq(s, s_size_of)) {
             tt = SIZEOF;
-          } else if (str_eq(src + token_start, len - token_start, "alignof", 7)) {
+          } else if (str_eq(s, s_align_of)) {
             tt = ALIGNOF;
           }
 

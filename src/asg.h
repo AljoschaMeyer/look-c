@@ -10,6 +10,7 @@
 #include <stdlib.h>
 
 #include "rax.h"
+#include "util.h"
 
 struct AsgMeta;
 
@@ -41,25 +42,20 @@ typedef enum {
 
 // A simple identifier
 typedef struct AsgSid {
-  const char *src;
-  size_t len;
+  Str str;
   BindingType bt;
   void *binding;
 } AsgSid;
 
 typedef struct AsgId {
-  const char *src;
-  size_t len;
+  Str str;
   AsgSid *sids; // stretchy buffer
 } AsgId;
 
 typedef struct AsgMacroInv {
-  const char *src;
-  size_t len;
-  const char *name;
-  size_t name_len;
-  const char *args;
-  size_t args_len;
+  Str str;
+  Str name;
+  Str args;
 } AsgMacroInv;
 
 typedef enum {
@@ -69,8 +65,7 @@ typedef enum {
 } TagLiteral;
 
 typedef struct AsgLiteral {
-  const char *src;
-  size_t len;
+  Str str;
   TagLiteral tag;
 } AsgLiteral;
 
@@ -110,11 +105,9 @@ typedef struct AsgRepeatBinOp {
 } AsgRepeatBinOp;
 
 typedef struct AsgRepeat {
-  const char *src;
-  size_t len;
+  Str str;
   TagRepeat tag;
   union {
-    char integer; // always an integer literal
     AsgMacroInv macro;
     AsgType *size_of;
     AsgType *align_of;
@@ -124,8 +117,7 @@ typedef struct AsgRepeat {
 
 // Root node of the asg.
 typedef struct AsgFile {
-  const char *src;
-  size_t len;
+  Str str;
   AsgItem *items; // stretchy buffer
   AsgMeta **attrs; // stretchy buffer of stretchy buffers, same length as items
   // rax *items_by_id; // stores `AsgItem`s TODO remove this, keep analysis separate?
@@ -142,11 +134,9 @@ typedef enum {
 } TagMeta;
 
 typedef struct AsgMeta {
-  const char *src;
-  size_t len;
+  Str str;
   TagMeta tag;
-  const char *name;
-  size_t name_len;
+  Str name;
   union {
     AsgLiteral unary;
     AsgMeta *nested; // stretchy buffer
@@ -169,8 +159,7 @@ typedef enum {
 } TagUseTree;
 
 typedef struct AsgUseTree {
-  const char *src;
-  size_t len;
+  Str str;
   TagUseTree tag;
   AsgSid sid;
   union {
@@ -242,8 +231,7 @@ typedef struct AsgSummandNamed {
 } AsgSummandNamed;
 
 typedef struct AsgSummand {
-  const char *src;
-  size_t len;
+  Str str;
   TagSummand tag;
   AsgSid sid;
   union {
@@ -258,8 +246,7 @@ typedef struct AsgTypeSum {
 } AsgTypeSum;
 
 typedef struct AsgType {
-  const char *src;
-  size_t len;
+  Str str;
   TagType tag;
   union {
     AsgId id;
@@ -318,8 +305,7 @@ typedef struct AsgPatternSummandNamed {
 } AsgPatternSummandNamed;
 
 typedef struct AsgPattern {
-  const char *src;
-  size_t len;
+  Str str;
   TagPattern tag;
   union {
     AsgPatternId id;
@@ -333,8 +319,7 @@ typedef struct AsgPattern {
 } AsgPattern;
 
 typedef struct AsgBlock {
-  const char *src;
-  size_t len;
+  Str str;
   AsgExp *exps; // stretchy buffer
   AsgMeta **attrs; // stretchy buffer of stretchy buffers, same length as exps
 } AsgBlock;
@@ -472,8 +457,7 @@ typedef struct AsgExpLoop {
 } AsgExpLoop;
 
 typedef struct AsgExp {
-  const char *src;
-  size_t len;
+  Str str;
   ExpTag tag;
   union {
     AsgId id;
@@ -529,8 +513,7 @@ typedef struct AsgItemFun {
 } AsgItemFun;
 
 typedef struct AsgItemFfiInclude {
-  const char *include; // e.g. <stdio.h> or "asg.h"
-  size_t include_len;
+  Str include;
 } AsgItemFfiInclude;
 
 typedef struct AsgItemFfiVal {
@@ -540,8 +523,7 @@ typedef struct AsgItemFfiVal {
 } AsgItemFfiVal;
 
 typedef struct AsgItem {
-  const char *src;
-  size_t len;
+  Str str;
   TagItem tag;
   bool pub; // ignored for ffi_includes
   union {

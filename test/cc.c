@@ -13,7 +13,7 @@ void test_cc(void) {
 
   assert(parse_file(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
-  assert(data.len == strlen(src));
+  assert(data.str.len == strlen(src));
   assert(sb_count(data.items) == 2);
   assert(sb_count(data.attrs) == 2);
   assert(data.items[0].tag == ITEM_TYPE);
@@ -28,7 +28,7 @@ void test_cc(void) {
   raxInsert(features, "bar", 3, NULL, NULL);
   oo_filter_cc(&data, features);
 
-  assert(data.len == strlen(src));
+  assert(data.str.len == strlen(src));
   assert(sb_count(data.items) == 1);
   assert(sb_count(data.attrs) == 1);
   assert(data.items[0].tag == ITEM_FUN);
