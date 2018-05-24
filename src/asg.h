@@ -12,8 +12,7 @@
 #include "rax.h"
 #include "util.h"
 
-struct AsgMeta;
-
+typedef struct AsgFile AsgFile;
 typedef struct AsgItem AsgItem;
 typedef struct AsgMeta AsgMeta;
 typedef struct AsgType AsgType;
@@ -25,26 +24,27 @@ typedef struct AsgBlock AsgBlock;
 typedef struct AsgUseTree AsgUseTree;
 
 typedef enum {
-  BINDING_NONE, // the sid does not resolve to a binding (because it defines one)
-  BINDING_ERROR, // binding resolution failed
-  BINDING_ITEM_USE,
-  BINDING_ITEM_USE_RENAME,
-  BINDING_ITEM_TYPE,
-  BINDING_ITEM_VAL,
-  BINDING_ITEM_FUN,
-  BINDING_ITEM_FFI,
-  BINDING_PATTERN,
-  BINDING_FIELD,
-  BINDING_TYPE_ARG
-  // TODO local val? fn args? named products?
-  // Add these as necessary when implementing binding resolution.
-} BindingType;
+  BINDING_TYPE,
+  BINDING_VAL,
+  BINDING_FUN,
+  BINDING_FFI_VAL,
+  BINDING_MOD
+} TagBinding;
+
+typedef struct AsgBinding {
+  TagBinding tag;
+  union {
+    AsgItem *type;
+    AsgItem *val;
+    AsgItem *fun;
+    AsgItem *ffi_val;
+    AsgFile *mod;
+  };
+} AsgBinding;
 
 // A simple identifier
 typedef struct AsgSid {
   Str str;
-  BindingType bt;
-  void *binding;
 } AsgSid;
 
 typedef struct AsgId {
@@ -122,9 +122,10 @@ typedef struct AsgFile {
   AsgMeta **attrs; // stretchy buffer of stretchy buffers, same length as items
   // The below raxes store pointers to AsgItems, which may reside in another
   // AsgFile, if they were brought into scope via a use.
-  rax *items_by_sid; // map from Strs to all named items, NULL if !did_init_items_by_sid
-  rax *pub_items_by_sid; // map from Strs to only the public named items, NULL if !did_init_items_by_sid
-  bool did_init_items_by_sid; // whether the (pub_)items_by_sid maps have been initialized
+  rax *bindings_by_sid; // map from Strs to all named items, NULL if !did_init_items_by_sid
+  rax *pub_bindings_by_sid; // map from Strs to only the public named items, NULL if !did_init_items_by_sid
+  bool did_init_bindings_by_sid; // whether the (pub_)items_by_sid maps have been initialized
+  AsgBinding *bindings; // stretchy buffer, owned by the file
 } AsgFile;
 
 // Filters out all items and expressions with cc (conditional compilation)

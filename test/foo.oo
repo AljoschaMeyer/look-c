@@ -1,3 +1,8 @@
 pub type a = b
 
 val c = d
+
+use mod::dir::bar::a as e
+use mod::dir::bar::qux
+use mod::dir::bar::qux::a as f
+use mod::dir::bar::b as g

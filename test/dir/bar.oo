@@ -1,1 +1,4 @@
 pub val a = b
+
+pub use mod::baz as qux
+pub use qux::a as b

@@ -1,0 +1,2 @@
+pub type a = b
+use mod::foo::a
