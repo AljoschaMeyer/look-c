@@ -13,7 +13,9 @@ void test_file_not_found(void) {
 
   OoContext cx;
   cx.deps = "foo";
+  cx.deps_mod = NULL;
   cx.mods = "bar";
+  cx.mods_mod = NULL;
   cx.features = raxNew();
   cx.files = raxNew();
 
@@ -32,7 +34,9 @@ void test_read_file(void) {
 
   OoContext cx;
   cx.deps = "foo";
+  cx.deps_mod = NULL;
   cx.mods = "bar";
+  cx.mods_mod = NULL;
   cx.features = raxNew();
   cx.files = raxNew();
 
@@ -62,7 +66,9 @@ void test_get_file_ids(void) {
 
   OoContext cx;
   cx.deps = deps;
+  cx.deps_mod = NULL;
   cx.mods = mods;
+  cx.mods_mod = NULL;
   cx.features = raxNew();
   cx.files = raxNew();
 

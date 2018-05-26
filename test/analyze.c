@@ -51,7 +51,7 @@ void test_init_item_maps(void) {
 
   AsgBinding b;
 
-  oo_init_item_maps(asg, &cx, &err);
+  oo_init_mods(asg, &cx, &err);
   assert(err.tag == OO_ERR_NONE);
   assert(asg->did_init_bindings_by_sid);
 
@@ -85,7 +85,7 @@ void test_init_item_maps(void) {
   assert(b.tag == BINDING_TYPE);
   assert(b.type == &baz->items[0]);
 
-  // TODO test more stuff: using sum variants
+  // TODO test more stuff: multiple branches, inner mod (self), deps, using sum variants
 
   oo_context_free(&cx);
   free_inner_file(*asg);
@@ -123,7 +123,7 @@ void test_init_item_maps_duplicates(void) {
   assert(asg != NULL);
   assert(err.tag == OO_ERR_NONE);
 
-  oo_init_item_maps(asg, &cx, &err);
+  oo_init_mods(asg, &cx, &err);
   assert(err.tag == OO_ERR_DUP_ID);
   assert(str_eq_parts(err.dup, "a", 1));
 
@@ -161,7 +161,7 @@ void test_init_item_maps_use_duplicates(void) {
   assert(asg != NULL);
   assert(err.tag == OO_ERR_NONE);
 
-  oo_init_item_maps(asg, &cx, &err);
+  oo_init_mods(asg, &cx, &err);
   assert(err.tag == OO_ERR_DUP_ID);
   assert(str_eq_parts(err.dup, "a", 1));
 

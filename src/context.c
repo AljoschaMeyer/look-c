@@ -118,4 +118,6 @@ AsgFile *oo_get_file_ids(OoContext *cx, OoError *err, Str *ids /* stretchy buffe
 void oo_context_free(OoContext *cx) {
   raxFree(cx->features);
   raxFree(cx->files);
+  free(cx->mods_mod); // TODO this needs to be freed recursively
+  free(cx->deps_mod); // TODO does this need recursive free as well?
 }

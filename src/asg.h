@@ -22,6 +22,7 @@ typedef struct AsgLValue AsgLValue;
 typedef struct AsgPattern AsgPattern;
 typedef struct AsgBlock AsgBlock;
 typedef struct AsgUseTree AsgUseTree;
+typedef struct AsgMod AsgMod;
 
 typedef enum {
   BINDING_TYPE,
@@ -38,9 +39,17 @@ typedef struct AsgBinding {
     AsgItem *val;
     AsgItem *fun;
     AsgItem *ffi_val;
-    AsgFile *mod;
+    AsgMod *mod;
   };
 } AsgBinding;
+
+// Not syntactic, part of the name resolution. Each file owns one of these,
+// and the OoContext holds one per directory.
+typedef struct AsgMod {
+  rax *bindings_by_sid;
+  rax *pub_bindings_by_sid;
+  AsgBinding *bindings; // stretchy buffer owning all bindings
+} AsgMod;
 
 // A simple identifier
 typedef struct AsgSid {
@@ -120,12 +129,8 @@ typedef struct AsgFile {
   Str str;
   AsgItem *items; // stretchy buffer
   AsgMeta **attrs; // stretchy buffer of stretchy buffers, same length as items
-  // The below raxes store pointers to AsgItems, which may reside in another
-  // AsgFile, if they were brought into scope via a use.
-  rax *bindings_by_sid; // map from Strs to all named items, NULL if !did_init_items_by_sid
-  rax *pub_bindings_by_sid; // map from Strs to only the public named items, NULL if !did_init_items_by_sid
-  bool did_init_bindings_by_sid; // whether the (pub_)items_by_sid maps have been initialized
-  AsgBinding *bindings; // stretchy buffer, owned by the file
+  AsgMod mod;
+  bool did_init_mod;
 } AsgFile;
 
 // Filters out all items and expressions with cc (conditional compilation)

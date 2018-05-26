@@ -7,7 +7,9 @@
 #include "util.h"
 
 typedef enum {
-  OO_ERR_NONE, OO_ERR_SYNTAX, OO_ERR_FILE, OO_ERR_IMPORT, OO_ERR_DUP_ID
+  OO_ERR_NONE, OO_ERR_SYNTAX, OO_ERR_FILE, OO_ERR_IMPORT, OO_ERR_DUP_ID,
+  OO_ERR_NONEXISTING_SID, OO_ERR_INVALID_BRANCH, OO_ERR_UNEXPECTED_DEP,
+  OO_ERR_UNEXPECTED_MOD
 } OoErrorTag;
 
 typedef struct OoError {
@@ -15,14 +17,18 @@ typedef struct OoError {
   union {
     ParserError parser;
     Str dup;
+    Str nonexisting_sid;
+    Str invalid_branch;
   };
 } OoError;
 
 typedef struct OoContext {
   // file path of the directory from which to resolve mods
   const char *mods;
+  AsgMod *mods_mod; // must be set to NULL initially
   // file path of the directory in which to look for deps
   const char *deps;
+  AsgMod *deps_mod; // must be set to NULL initially
   // Set of enabled features, used for conditional compilation
   rax *features;
   // Map from file paths to AsgFiles
@@ -44,7 +50,7 @@ AsgFile *oo_get_file(OoContext *cx, OoError *err, Str path);
 AsgFile *oo_get_file_ids(OoContext *cx, OoError *err, Str *ids /* stretchy buffer */);
 
 // Populates the items_by_sid and pub_items_by_sid maps.
-void oo_init_item_maps(AsgFile *asg, OoContext *cx, OoError *err);
+void oo_init_mods(AsgFile *asg, OoContext *cx, OoError *err);
 
 // Frees the features and files raxes, but not their content.
 void oo_context_free(OoContext *cx);
