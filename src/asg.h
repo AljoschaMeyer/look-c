@@ -51,6 +51,8 @@ typedef struct AsgMod {
   AsgBinding *bindings; // stretchy buffer owning all bindings
 } AsgMod;
 
+void free_inner_mod(AsgMod mod);
+
 // A simple identifier
 typedef struct AsgSid {
   Str str;

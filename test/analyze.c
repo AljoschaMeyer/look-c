@@ -53,35 +53,35 @@ void test_init_item_maps(void) {
 
   oo_init_mods(asg, &cx, &err);
   assert(err.tag == OO_ERR_NONE);
-  assert(asg->did_init_bindings_by_sid);
+  assert(asg->did_init_mod);
 
-  b = *(AsgBinding *) raxFind(asg->bindings_by_sid, "a", 1);
+  b = *(AsgBinding *) raxFind(asg->mod.bindings_by_sid, "a", 1);
   assert(b.tag == BINDING_TYPE);
   assert(b.type == &asg->items[0]);
 
-  b = *(AsgBinding *) raxFind(asg->bindings_by_sid, "c", 1);
+  b = *(AsgBinding *) raxFind(asg->mod.bindings_by_sid, "c", 1);
   assert(b.tag == BINDING_VAL);
   assert(b.val == &asg->items[1]);
 
-  b = *(AsgBinding *) raxFind(asg->pub_bindings_by_sid, "a", 1);
+  b = *(AsgBinding *) raxFind(asg->mod.pub_bindings_by_sid, "a", 1);
   assert(b.tag == BINDING_TYPE);
   assert(b.type == &asg->items[0]);
 
-  assert(raxFind(asg->pub_bindings_by_sid, "c", 1) == raxNotFound);
+  assert(raxFind(asg->mod.pub_bindings_by_sid, "c", 1) == raxNotFound);
 
-  b = *(AsgBinding *) raxFind(asg->bindings_by_sid, "e", 1);
+  b = *(AsgBinding *) raxFind(asg->mod.bindings_by_sid, "e", 1);
   assert(b.tag == BINDING_VAL);
   assert(b.val == &bar->items[0]);
 
-  b = *(AsgBinding *) raxFind(asg->bindings_by_sid, "qux", 3);
+  b = *(AsgBinding *) raxFind(asg->mod.bindings_by_sid, "qux", 3);
   assert(b.tag == BINDING_MOD);
-  assert(b.mod == baz);
+  assert(b.mod == &baz->mod);
 
-  b = *(AsgBinding *) raxFind(asg->bindings_by_sid, "f", 1);
+  b = *(AsgBinding *) raxFind(asg->mod.bindings_by_sid, "f", 1);
   assert(b.tag == BINDING_TYPE);
   assert(b.type == &baz->items[0]);
 
-  b = *(AsgBinding *) raxFind(asg->bindings_by_sid, "g", 1);
+  b = *(AsgBinding *) raxFind(asg->mod.bindings_by_sid, "g", 1);
   assert(b.tag == BINDING_TYPE);
   assert(b.type == &baz->items[0]);
 

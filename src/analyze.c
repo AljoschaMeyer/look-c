@@ -4,10 +4,10 @@
 #include "stretchy_buffer.h"
 #include "util.h"
 
-static void resolve_use(UseTree *use, bool pub, AsgMod *mod, AsgMod *parent_mod, OoContext *cx, OoError *err);
+static void resolve_use(AsgUseTree *use, bool pub, AsgMod *mod, AsgMod *parent_mod, OoContext *cx, OoError *err);
 
 void oo_init_mods(AsgFile *asg, OoContext *cx, OoError *err) {
-  asg->did_init_mods = true;
+  asg->did_init_mod = true;
   asg->mod.bindings_by_sid = raxNew();
   asg->mod.pub_bindings_by_sid = raxNew();
   asg->mod.bindings = NULL;
@@ -58,7 +58,8 @@ void oo_init_mods(AsgFile *asg, OoContext *cx, OoError *err) {
 
         break;
       case ITEM_USE:
-        AsgMod parent_mod;
+        ;
+        AsgMod *parent_mod;
         if (str_eq_parts(asg->items[i].use.sid.str, "dep", 3)) {
           if (asg->items[i].use.tag != USE_TREE_BRANCH) {
             err->tag = OO_ERR_UNEXPECTED_DEP;
@@ -84,7 +85,7 @@ void oo_init_mods(AsgFile *asg, OoContext *cx, OoError *err) {
         } else {
           parent_mod = &asg->mod;
         }
-        resolve_use(&asg->items[i].use, asg->items[i].pub, &asg->mod, &parent_mod, cx, err);
+        resolve_use(&asg->items[i].use, asg->items[i].pub, &asg->mod, parent_mod, cx, err);
         break;
       case ITEM_FFI_INCLUDE:
         // noop
@@ -94,19 +95,20 @@ void oo_init_mods(AsgFile *asg, OoContext *cx, OoError *err) {
 }
 
 // (Recursively) add all bindings from the given UseTree to the mod.
-static void resolve_use(UseTree *use, bool pub, AsgMod *mod, AsgMod *parent_mod, OoContext *cx, OoError *err) {
+static void resolve_use(AsgUseTree *use, bool pub, AsgMod *mod, AsgMod *parent_mod, OoContext *cx, OoError *err) {
   AsgBinding *b;
 
   if (use->tag != USE_TREE_BRANCH && str_eq_parts(use->sid.str, "mod", 3)) {
-    b.tag = BINDING_MOD; // XXX what about sum types?
-    b.mod = parent_mod;
+    b = malloc(sizeof(AsgBinding));
+    b->tag = BINDING_MOD; // XXX what about sum types?
+    b->mod = parent_mod;
   } else {
     b = raxFind(parent_mod->bindings_by_sid, use->sid.str.start, use->sid.str.len);
   }
 
   if (b == raxNotFound) {
     err->tag = OO_ERR_NONEXISTING_SID;
-    err->nonexisting_sid = asg->items[i].use.sid.str;
+    err->nonexisting_sid = use->sid.str;
     return;
   }
 
@@ -114,7 +116,7 @@ static void resolve_use(UseTree *use, bool pub, AsgMod *mod, AsgMod *parent_mod,
   int count;
   switch (use->tag) {
     case USE_TREE_RENAME:
-      str = use->rename;
+      str = use->rename.str;
       __attribute__((fallthrough));
     case USE_TREE_LEAF:
       if (raxInsert(mod->bindings_by_sid, str.start, str.len, b, NULL)) {
@@ -134,13 +136,17 @@ static void resolve_use(UseTree *use, bool pub, AsgMod *mod, AsgMod *parent_mod,
         return;
       }
 
-      count = sb_count(sb);
-      for (i = 0; i < count; i++) {
-        resolve_use(use->branch[i], pub, mod, b->mod, cx, err);
+      count = sb_count(use->branch);
+      for (int i = 0; i < count; i++) {
+        resolve_use(&use->branch[i], pub, mod, b->mod, cx, err);
         if (err->tag != OO_ERR_NONE) {
           return;
         }
       }
       break;
+  }
+
+  if (use->tag != USE_TREE_BRANCH && str_eq_parts(use->sid.str, "mod", 3)) {
+    free(b);
   }
 }
