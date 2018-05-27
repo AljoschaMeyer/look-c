@@ -1,6 +1,6 @@
 // An abstract syntax graph for look.
 // This graph contains pointer into the concrete syntax, and it also holds
-// type information. It's one datastructure for everything the compiler
+// type information. It is one datastructure for everything the compiler
 // needs to do.
 #ifndef OO_ASG_H
 #define OO_ASG_H
@@ -12,7 +12,10 @@
 #include "rax.h"
 #include "util.h"
 
+// A datastructure representing the content of a file of oo code.
+// It transitively owns all its data, excluding pointers to bindings.
 typedef struct AsgFile AsgFile;
+
 typedef struct AsgItem AsgItem;
 typedef struct AsgMeta AsgMeta;
 typedef struct AsgType AsgType;
@@ -22,16 +25,17 @@ typedef struct AsgLValue AsgLValue;
 typedef struct AsgPattern AsgPattern;
 typedef struct AsgBlock AsgBlock;
 typedef struct AsgUseTree AsgUseTree;
-typedef struct AsgMod AsgMod;
+typedef struct AsgNS AsgNS;
 
 typedef enum {
   BINDING_TYPE,
   BINDING_VAL,
   BINDING_FUN,
   BINDING_FFI_VAL,
-  BINDING_MOD
+  BINDING_NS
 } TagBinding;
 
+// References to other parts of the ASG.
 typedef struct AsgBinding {
   TagBinding tag;
   union {
@@ -39,19 +43,19 @@ typedef struct AsgBinding {
     AsgItem *val;
     AsgItem *fun;
     AsgItem *ffi_val;
-    AsgMod *mod;
+    AsgNS *ns;
   };
 } AsgBinding;
 
-// Not syntactic, part of the name resolution. Each file owns one of these,
-// and the OoContext holds one per directory.
-typedef struct AsgMod {
+// A namespace. These are owned by AsgFiles, sum types, and by the OoContext (for
+// the mod and dep namespace, and for all directories).
+typedef struct AsgNS {
   rax *bindings_by_sid;
   rax *pub_bindings_by_sid;
-  AsgBinding *bindings; // stretchy buffer owning all bindings
-} AsgMod;
+  AsgBinding *bindings; // owning stretchy buffer
+} AsgNS;
 
-void free_inner_mod(AsgMod mod);
+void free_ns(AsgNS ns);
 
 // A simple identifier
 typedef struct AsgSid {
@@ -128,11 +132,10 @@ typedef struct AsgRepeat {
 
 // Root node of the asg.
 typedef struct AsgFile {
-  Str str;
-  AsgItem *items; // stretchy buffer
-  AsgMeta **attrs; // stretchy buffer of stretchy buffers, same length as items
-  AsgMod mod;
-  bool did_init_mod;
+  Str str; // not owning
+  AsgItem *items; // owning stretchy buffer
+  AsgMeta **attrs; // owning stretchy buffer of owning stretchy buffers, same length as items
+  AsgNS ns;
 } AsgFile;
 
 // Filters out all items and expressions with cc (conditional compilation)

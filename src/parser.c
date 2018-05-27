@@ -3455,21 +3455,21 @@ size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
   data->str.len = l;
   data->items = items;
   data->attrs = all_attrs;
-  data->did_init_mod = false;
+  data->ns.bindings = NULL;
   return l;
 }
 
-void free_inner_mod(AsgMod mod) {
-  raxFree(mod.bindings_by_sid);
-  raxFree(mod.pub_bindings_by_sid);
-  sb_free(mod.bindings);
+void free_inner_ns(AsgNS ns) {
+  raxFree(ns.bindings_by_sid);
+  raxFree(ns.pub_bindings_by_sid);
+  sb_free(ns.bindings);
 }
 
 void free_inner_file(AsgFile data) {
   free_sb_items(data.items);
   free_sb_sb_meta(data.attrs);
 
-  if (data.did_init_mod) {
-    free_inner_mod(data.mod);
+  if (data.ns.bindings) {
+    free_inner_ns(data.ns);
   }
 }
