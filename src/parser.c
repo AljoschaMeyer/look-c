@@ -3456,6 +3456,8 @@ size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
   data->items = items;
   data->attrs = all_attrs;
   data->ns.bindings = NULL;
+  data->ns.tag = NS_FILE;
+  data->ns.file = data;
   return l;
 }
 

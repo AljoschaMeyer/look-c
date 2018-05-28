@@ -72,10 +72,10 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
       case DT_DIR:
         sb_push(cx->dirs, malloc(sizeof(AsgNS)));
         dir_ns = cx->dirs[sb_count(cx->dirs) - 1];
-        // dir_ns = sb_add(cx->dirs, 1);
         dir_ns->bindings = NULL;
         dir_ns->bindings_by_sid = raxNew();
         dir_ns->pub_bindings_by_sid = NULL;
+        dir_ns->tag = NS_DIR;
 
         inner_binding->tag = BINDING_NS;
         inner_binding->ns = dir_ns;
@@ -132,12 +132,12 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
         sb_push(cx->files, malloc(sizeof(AsgFile)));
         asg = cx->files[sb_count(cx->files) - 1];
 
-        // asg = sb_add(cx->files, 1);
         parse_file(*src, &err->parser, asg);
         if (err->parser.tag != ERR_NONE) {
           err->tag = OO_ERR_SYNTAX;
           goto done;
         }
+        asg->path = inner_path;
 
         oo_filter_cc(asg, features);
 
@@ -164,6 +164,7 @@ void oo_cx_parse(OoContext *cx, OoError *err, rax *features) {
   cx->dirs[0]->bindings = NULL;
   cx->dirs[0]->bindings_by_sid = raxNew();
   cx->dirs[0]->pub_bindings_by_sid = NULL;
+  cx->dirs[0]->tag = NS_MODS;
 
   parse_handle_dir(cx->mods, cx->dirs[0], cx, err, features);
   if (err->tag != OO_ERR_NONE) {
@@ -174,6 +175,7 @@ void oo_cx_parse(OoContext *cx, OoError *err, rax *features) {
   cx->dirs[1]->bindings = NULL;
   cx->dirs[1]->bindings_by_sid = raxNew();
   cx->dirs[1]->pub_bindings_by_sid = NULL;
+  cx->dirs[1]->tag = NS_DEPS;
 
   parse_handle_dir(cx->deps, cx->dirs[1], cx, err, features);
 }
@@ -200,117 +202,139 @@ void oo_cx_free(OoContext *cx) {
   sb_free(cx->sources);
 }
 
-// AsgFile *oo_get_file(OoContext *cx, OoError *err, Str path) {
-//   char *src = NULL;
-//
-//   void *f = raxFind(cx->files, path.start, path.len);
-//   if (f == raxNotFound) {
-//     FILE *f = fopen(path.start, "r");
-//     if (f == NULL) {
-//       goto file_err;
-//     }
-//     if (fseek(f, 0, SEEK_END)) {
-//       goto file_err;
-//     }
-//     long fsize = ftell(f);
-//     if (fsize < 0) {
-//       goto file_err;
-//     }
-//     rewind(f);
-//
-//     src = malloc(fsize + 1);
-//     fread(src, fsize, 1, f);
-//     if (ferror(f)) {
-//       goto file_err;
-//     }
-//     src[fsize] = 0;
-//
-//     if (fclose(f)) {
-//       goto file_err;
-//     }
-//     // end file handling
-//
-//     AsgFile *asg = malloc(sizeof(AsgFile));
-//     parse_file(src, &err->parser, asg);
-//     if (err->parser.tag != ERR_NONE) {
-//       free(src);
-//       free(asg);
-//       err->tag = OO_ERR_SYNTAX;
-//       return NULL;
-//     }
-//
-//     oo_filter_cc(asg, cx->features);
-//
-//     raxInsert(cx->files, path.start, path.len, asg, NULL);
-//
-//     err->tag = OO_ERR_NONE;
-//     return asg;
-//   } else {
-//     err->tag = OO_ERR_NONE;
-//     return (AsgFile *) f;
-//   }
-//
-//   file_err:
-//   free(src);
-//   err->tag = OO_ERR_FILE;
-//   return NULL;
-// }
-//
-// AsgFile *oo_get_file_ids(OoContext *cx, OoError *err, Str *ids /* stretchy buffer */) {
-//   if (sb_count(ids) < 2) {
-//     err->tag = OO_ERR_IMPORT;
-//     return NULL;
-//   }
-//   if (str_eq_parts(ids[0], "mod", 3)) {
-//     size_t mods_len = strlen(cx->mods);
-//     Str s;
-//     s.len = mods_len;
-//     size_t count = (size_t) sb_count(ids);
-//     for (size_t i = 1; i < count; i++) {
-//       s.len += 1; // "/"
-//       s.len += ids[i].len;
-//     }
-//     s.len += 4; // ".oo" NULL
-//
-//     char *path = malloc(s.len);
-//     strcpy(path, cx->mods);
-//     size_t offset = mods_len;
-//     for (size_t i = 1; i < count; i++) {
-//       path[offset] = '/';
-//       offset += 1;
-//       strncpy(path + offset, ids[i].start, ids[i].len);
-//       offset += ids[i].len;
-//     }
-//     memcpy(path + offset, ".oo", 4);
-//     s.start = path;
-//
-//     AsgFile *asg = oo_get_file(cx, err, s);
-//     free(path);
-//     return asg;
-//   } else if (str_eq_parts(ids[0], "dep", 3)) {
-//     size_t deps_len = strlen(cx->deps);
-//     Str s;
-//     s.len = deps_len + 1 + ids[1].len + 8 /* "/lib.oo" NULL */;
-//
-//     char *path = malloc(s.len);
-//     strcpy(path, cx->deps);
-//     path[deps_len] = '/';
-//     strncpy(path + deps_len + 1, ids[1].start, ids[1].len);
-//     strncpy(path + deps_len + 1 + ids[1].len, "/lib.oo", 8);
-//     s.start = path;
-//
-//     AsgFile *asg = oo_get_file(cx, err, s);
-//     free(path);
-//     return asg;
-//   } else {
-//     err->tag = OO_ERR_IMPORT;
-//     return NULL;
-//   }
-// }
-//
-// void oo_context_free(OoContext *cx) {
-//   raxFree(cx->features);
-//   raxFree(cx->files);
-//   free(cx->mods_mod); // TODO this needs to be freed recursively
-//   free(cx->deps_mod); // TODO does this need recursive free as well?
-// }
+static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg);
+
+// (Recursively) add all bindings from the given UseTree to the mod.
+static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns, OoContext *cx, OoError *err) {
+  AsgBinding *b = raxFind(ns->bindings_by_sid, use->sid.str.start, use->sid.str.len);
+
+    if (b == raxNotFound) {
+      err->tag = OO_ERR_NONEXISTING_SID_USE;
+      err->nonexisting_sid_use = use;
+      return;
+    }
+
+  if (b->tag == BINDING_NS && b->ns->tag == NS_FILE && b->ns->bindings == NULL) {
+    file_coarse_bindings(cx, err, b->ns->file);
+    if (err->tag != OO_ERR_NONE) {
+      return;
+    }
+  }
+
+  Str str = use->sid.str;
+  int count;
+  switch (use->tag) {
+    case USE_TREE_RENAME:
+      str = use->rename.str;
+      __attribute__((fallthrough));
+    case USE_TREE_LEAF:
+      if (raxInsert(ns->bindings_by_sid, str.start, str.len, b, NULL)) {
+        if (pub) {
+          raxInsert(ns->pub_bindings_by_sid, str.start, str.len, b, NULL);
+        }
+      } else {
+        err->tag = OO_ERR_DUP_ID_ITEM_USE;
+        err->dup_item_use = use;
+        return;
+      }
+      break;
+    case USE_TREE_BRANCH:
+      if (b->tag != BINDING_NS) {
+        err->tag = OO_ERR_INVALID_BRANCH;
+        err->invalid_branch = use;
+        return;
+      }
+
+      count = sb_count(use->branch);
+      for (int i = 0; i < count; i++) {
+        resolve_use(&use->branch[i], pub, ns, cx, err);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+  }
+}
+
+static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
+    if (sb_count(asg->ns.bindings) != 0) {
+      err->tag = OO_ERR_CYCLIC_USES;
+      err->file = asg->path;
+      return;
+    }
+
+    size_t count = sb_count(asg->items);
+    sb_add(asg->ns.bindings, 2 + (int) count);
+    asg->ns.bindings_by_sid = raxNew();
+    asg->ns.pub_bindings_by_sid = raxNew();
+
+    asg->ns.bindings[0].tag = BINDING_NS;
+    asg->ns.bindings[0].ns = cx->dirs[0];
+    raxInsert(asg->ns.bindings_by_sid, "mod", 3, &asg->ns.bindings[0], NULL);
+
+    asg->ns.bindings[1].tag = BINDING_NS;
+    asg->ns.bindings[1].ns = cx->dirs[1];
+    raxInsert(asg->ns.bindings_by_sid, "dep", 3, &asg->ns.bindings[1], NULL);
+
+    for (size_t i = 0; i < count; i++) {
+      Str str;
+      switch (asg->items[i].tag) {
+        case ITEM_TYPE:
+        case ITEM_VAL:
+        case ITEM_FUN:
+        case ITEM_FFI_VAL:
+          switch (asg->items[i].tag) {
+            case ITEM_TYPE:
+              str = asg->items[i].type.sid.str;
+              asg->ns.bindings[i].tag = BINDING_TYPE;
+              asg->ns.bindings[i].type = &asg->items[i];
+              break;
+            case ITEM_VAL:
+              str = asg->items[i].val.sid.str;
+              asg->ns.bindings[i].tag = BINDING_VAL;
+              asg->ns.bindings[i].val = &asg->items[i];
+              break;
+            case ITEM_FUN:
+              str = asg->items[i].fun.sid.str;
+              asg->ns.bindings[i].tag = BINDING_FUN;
+              asg->ns.bindings[i].fun = &asg->items[i];
+              break;
+            case ITEM_FFI_VAL:
+              str = asg->items[i].ffi_val.sid.str;
+              asg->ns.bindings[i].tag = BINDING_FFI_VAL;
+              asg->ns.bindings[i].ffi_val = &asg->items[i];
+              break;
+            default:
+              abort(); // unreachable
+          }
+
+          if (raxInsert(asg->ns.bindings_by_sid, str.start, str.len, &asg->ns.bindings[i], NULL)) {
+            if (asg->items[i].pub) {
+              raxInsert(asg->ns.pub_bindings_by_sid, str.start, str.len, &asg->ns.bindings[i], NULL);
+            }
+          } else {
+            err->tag = OO_ERR_DUP_ID_ITEM;
+            err->dup_item = &asg->items[i];
+            return;
+          }
+
+          break;
+        case ITEM_USE:
+          resolve_use(&asg->items[i].use, asg->items[i].pub, &asg->ns, cx, err);
+          break;
+        case ITEM_FFI_INCLUDE:
+          // noop
+          break;
+      }
+    }
+}
+
+void oo_cx_coarse_bindings(OoContext *cx, OoError *err) {
+  int count = sb_count(cx->files);
+  for (int i = 0; i < count; i++) {
+    file_coarse_bindings(cx, err, cx->files[i]);
+    if (err->tag != OO_ERR_NONE) {
+      return;
+    }
+  }
+}

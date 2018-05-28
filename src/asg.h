@@ -47,12 +47,23 @@ typedef struct AsgBinding {
   };
 } AsgBinding;
 
+typedef enum {
+  NS_FILE,
+  NS_DIR,
+  NS_MODS,
+  NS_DEPS
+} TagNS;
+
 // A namespace. These are owned by AsgFiles, sum types, and by the OoContext (for
 // the mod and dep namespace, and for all directories).
 typedef struct AsgNS {
   rax *bindings_by_sid;
   rax *pub_bindings_by_sid;
   AsgBinding *bindings; // owning stretchy buffer
+  TagNS tag;
+  union {
+    AsgFile *file;
+  };
 } AsgNS;
 
 void free_ns(AsgNS ns);
@@ -132,6 +143,7 @@ typedef struct AsgRepeat {
 
 // Root node of the asg.
 typedef struct AsgFile {
+  const char *path;
   Str str; // not owning
   AsgItem *items; // owning stretchy buffer
   AsgMeta **attrs; // owning stretchy buffer of owning stretchy buffers, same length as items
