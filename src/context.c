@@ -36,6 +36,9 @@ void oo_cx_init(OoContext *cx, const char *mods, const char *deps) {
 static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError *err, rax *features) {
   DIR *dp;
   struct dirent *ep;
+  size_t path_len = strlen(path);
+
+  // printf("handle dir: %s\n", path);
 
   dp = opendir(path);
   if (dp == NULL) {
@@ -44,9 +47,22 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
     return;
   }
 
+  char *inner_path;
+
   while ((ep = readdir(dp))) {
-    const char *inner_name = basename(ep->d_name);
+    if (
+      (strlen(ep->d_name) == 1 && strcmp(ep->d_name, ".") == 0) ||
+      (strlen(ep->d_name) == 2 && strcmp(ep->d_name, "..") == 0)
+    ) {
+      continue;
+    }
     AsgBinding *inner_binding = sb_add(ns->bindings, 1);
+    inner_path = malloc(path_len + 1 + strlen(ep->d_name) + 1);
+    strcpy(inner_path, path);
+    inner_path[path_len] = '/';
+    strcpy(inner_path + (path_len + 1), ep->d_name);
+
+    // printf("ep->d_name: %s\n", ep->d_name);
 
     AsgNS *dir_ns;
     FILE *f;
@@ -54,60 +70,69 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
     AsgFile *asg;
     switch (ep->d_type) {
       case DT_DIR:
-        dir_ns = sb_add(cx->dirs, 1);
+        sb_push(cx->dirs, malloc(sizeof(AsgNS)));
+        dir_ns = cx->dirs[sb_count(cx->dirs) - 1];
+        // dir_ns = sb_add(cx->dirs, 1);
         dir_ns->bindings = NULL;
         dir_ns->bindings_by_sid = raxNew();
         dir_ns->pub_bindings_by_sid = NULL;
 
         inner_binding->tag = BINDING_NS;
         inner_binding->ns = dir_ns;
-        raxInsert(ns->bindings_by_sid, inner_name, strlen(inner_name), (void *) inner_binding, NULL);
+        raxInsert(ns->bindings_by_sid, inner_path, strlen(inner_path), (void *) inner_binding, NULL);
 
-        parse_handle_dir(ep->d_name, dir_ns, cx, err, features);
+        parse_handle_dir(inner_path, dir_ns, cx, err, features);
         if (err->tag != OO_ERR_NONE) {
           goto done;
         }
         break;
       case DT_REG:
-        f = fopen(ep->d_name, "r");
+        // printf("  %s\n", "regular file");
+        // printf("  inner_path: %s\n", inner_path);
+        f = fopen(inner_path, "r");
         if (f == NULL) {
           err->tag = OO_ERR_FILE;
-          err->file = ep->d_name;
+          err->file = inner_path;
           goto done;
         }
         if (fseek(f, 0, SEEK_END)) {
           err->tag = OO_ERR_FILE;
-          err->file = ep->d_name;
+          err->file = inner_path;
           fclose(f);
           goto done;
         }
         long fsize = ftell(f);
         if (fsize < 0) {
           err->tag = OO_ERR_FILE;
-          err->file = ep->d_name;
+          err->file = inner_path;
           fclose(f);
           goto done;
         }
         rewind(f);
 
         src = sb_add(cx->sources, 1);
+        *src = malloc(fsize + 1);
         fread(*src, fsize, 1, f);
         if (ferror(f)) {
           err->tag = OO_ERR_FILE;
-          err->file = ep->d_name;
+          err->file = inner_path;
           fclose(f);
           goto done;
         }
-        *src[fsize] = 0;
+        (*src)[fsize] = 0;
 
         if (fclose(f)) {
           err->tag = OO_ERR_FILE;
-          err->file = ep->d_name;
+          err->file = inner_path;
           goto done;
         }
+        // printf("  %s\n", "file ops done");
         // end file handling
 
-        asg = sb_add(cx->files, 1);
+        sb_push(cx->files, malloc(sizeof(AsgFile)));
+        asg = cx->files[sb_count(cx->files) - 1];
+
+        // asg = sb_add(cx->files, 1);
         parse_file(*src, &err->parser, asg);
         if (err->parser.tag != ERR_NONE) {
           err->tag = OO_ERR_SYNTAX;
@@ -118,13 +143,14 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
 
         inner_binding->tag = BINDING_NS;
         inner_binding->ns = &asg->ns;
-        raxInsert(ns->bindings_by_sid, inner_name, strlen(inner_name) - 3 /* removes the .oo extension*/, (void *) inner_binding, NULL);
+        raxInsert(ns->bindings_by_sid, ep->d_name, strlen(ep->d_name) - 3 /* removes the .oo extension*/, (void *) inner_binding, NULL);
         break;
       default:
         err->tag = OO_ERR_FILE;
-        err->file = ep->d_name;
+        err->file = inner_path;
         goto done;
     }
+    free(inner_path);
   }
 
   done:
@@ -134,24 +160,36 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
 void oo_cx_parse(OoContext *cx, OoError *err, rax *features) {
   sb_add(cx->dirs, 2); // mod and dep dirs
 
-  parse_handle_dir(cx->mods, &cx->dirs[0], cx, err, features);
+  cx->dirs[0] = malloc(sizeof(AsgNS));
+  cx->dirs[0]->bindings = NULL;
+  cx->dirs[0]->bindings_by_sid = raxNew();
+  cx->dirs[0]->pub_bindings_by_sid = NULL;
+
+  parse_handle_dir(cx->mods, cx->dirs[0], cx, err, features);
   if (err->tag != OO_ERR_NONE) {
     return;
   }
 
-  parse_handle_dir(cx->deps, &cx->dirs[1], cx, err, features);
+  cx->dirs[1] = malloc(sizeof(AsgNS));
+  cx->dirs[1]->bindings = NULL;
+  cx->dirs[1]->bindings_by_sid = raxNew();
+  cx->dirs[1]->pub_bindings_by_sid = NULL;
+
+  parse_handle_dir(cx->deps, cx->dirs[1], cx, err, features);
 }
 
 void oo_cx_free(OoContext *cx) {
   int count = sb_count(cx->files);
   for (int i = 0; i < count; i++) {
-    free_inner_file(cx->files[i]);
+    free_inner_file(*(cx->files[i]));
+    free(cx->files[i]);
   }
   sb_free(cx->files);
 
   count = sb_count(cx->dirs);
   for (int i = 0; i < count; i++) {
-    free_ns(cx->dirs[i]);
+    free_ns(*(cx->dirs[i]));
+    free(cx->dirs[i]);
   }
   sb_free(cx->dirs);
 

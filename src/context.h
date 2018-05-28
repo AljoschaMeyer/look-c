@@ -32,13 +32,13 @@ typedef struct OoContext {
   const char *mods;
   // File path of the directory in which to look for deps
   const char *deps;
-  // Owning stretchy buffer of all files
-  AsgFile *files;
-  // Owning stretchy buffer of all implicit namespaces:
+  // Owning stretchy buffer of owned pointers to all files
+  AsgFile **files;
+  // Owning stretchy buffer of owned pointers to all implicit namespaces:
   // - dirs[0] is the `mod` namespace
   // - dirs[1] is the `dep` namespace
   // - remaining entries correspond to directories in the sources
-  AsgNS *dirs;
+  AsgNS **dirs;
   // Owning stretchy buffer of the source text of all files
   char **sources;
 } OoContext;
@@ -57,7 +57,6 @@ void oo_cx_coarse_bindings(OoContext *cx, OoError *err);
 // Frees all data owned by the context, including all parsed files and all namespaces.
 // The `mods` and `deps` directory paths are not freed.
 void oo_cx_free(OoContext *cx);
-// TODO delete manager.h
 
 
 // typedef struct OoContext {
