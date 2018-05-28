@@ -5,6 +5,7 @@
 
 #include "../src/stretchy_buffer.h"
 #include "../src/parser.h"
+#include "../src/cc.h"
 
 void test_cc(void) {
   char *src = "#[cc = \"foo\"]type a = b #[cc = \"bar\"]fn c = () {#[cc = \"bar\"]a; #[cc = \"baz\"]b}";
