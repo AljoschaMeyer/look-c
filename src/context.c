@@ -68,9 +68,13 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
   }
   rewinddir(dp);
   dir_len -= 2; // . and ..
-  sb_add(ns->bindings, (int) dir_len);
+  sb_add(ns->bindings, (int) dir_len + 1); // ns->bindings[0] is pointer to self
 
-  size_t i = 0;
+  ns->bindings[0].tag = BINDING_NS;
+  ns->bindings[0].ns = ns;
+  raxInsert(ns->bindings_by_sid, "mod", 3, (void *) &ns->bindings[0], NULL);
+
+  size_t i = 1;
   while ((ep = readdir(dp))) {
     if (
       (strlen(ep->d_name) == 1 && strcmp(ep->d_name, ".") == 0) ||
@@ -233,7 +237,7 @@ void oo_cx_free(OoContext *cx) {
 
 static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg);
 static void dir_coarse_bindings(OoContext *cx, OoError *err, AsgNS *dir);
-static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns, AsgNS *parent, OoContext *cx, OoError *err);
+static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns, AsgNS *parent, Str parent_name, OoContext *cx, OoError *err);
 
 void oo_cx_coarse_bindings(OoContext *cx, OoError *err) {
   int count = sb_count(cx->files);
@@ -261,70 +265,83 @@ static void prepare_file(OoContext *cx, OoError *err, AsgFile *file) {
 }
 
 // (Recursively) add all bindings from the given UseTree to the mod.
-static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns /* where to put the resolved bindings */, AsgNS *parent /* where to look for the sid */, OoContext *cx, OoError *err) {
-  AsgBinding *b = raxFind(parent->bindings_by_sid, use->sid.str.start, use->sid.str.len);
+static void resolve_use(
+  AsgUseTree *use,
+  bool pub,
+  AsgNS *ns, /* where to put the resolved bindings */
+  AsgNS *parent, /* where to look for the sid */
+  Str parent_name,
+  OoContext *cx,
+  OoError *err) {
+    AsgBinding *b = raxFind(parent->bindings_by_sid, use->sid.str.start, use->sid.str.len);
 
-  // printf("resolve use for ");
-  // str_print(use->str);
-  // printf(" in %s\n", use->asg->path);
+    // printf("resolve use for ");
+    // str_print(use->str);
+    // printf(" in %s\n", use->asg->path);
 
-  if (b == raxNotFound) {
-    err->tag = OO_ERR_NONEXISTING_SID_USE;
-    err->nonexisting_sid_use = use;
-    // printf("unfound str: ");
-    // str_print(use->sid.str);
-    // raxShow(parent->bindings_by_sid);
-    // printf("actual addr: %p\n", (void *) ns);
-    // printf("actual addr of asg: %p\n", (void *) use->asg);
-    return;
-  }
-
-  if (b->tag == BINDING_NS && b->ns->tag == NS_FILE) {
-    prepare_file(cx, err, b->ns->file);
-    if (err->tag != OO_ERR_NONE) {
+    if (b == raxNotFound) {
+      err->tag = OO_ERR_NONEXISTING_SID_USE;
+      err->nonexisting_sid_use = use;
+      // printf("unfound str: ");
+      // str_print(use->sid.str);
+      // raxShow(parent->bindings_by_sid);
+      // printf("actual addr: %p\n", (void *) ns);
+      // printf("actual addr of asg: %p\n", (void *) use->asg);
       return;
     }
-  }
 
-  // TODO sum types?
+    if (b->tag == BINDING_NS && b->ns->tag == NS_FILE) {
+      prepare_file(cx, err, b->ns->file);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+    }
 
-  Str str = use->sid.str;
-  int count;
-  switch (use->tag) {
-    case USE_TREE_RENAME:
-      // printf("rename: ");
-      // str_print(use->rename.str);
-      str = use->rename.str;
-      __attribute__((fallthrough));
-    case USE_TREE_LEAF: // TODO special handling for "mod" keyword
-      // printf("inserting ");
-      // str_print(str);
-      if (raxInsert(ns->bindings_by_sid, str.start, str.len, b, NULL)) {
-        if (pub && ns->tag == NS_FILE) {
-          raxInsert(ns->pub_bindings_by_sid, str.start, str.len, b, NULL);
+    // TODO sum types?
+
+    Str str = use->sid.str;
+    int count;
+    switch (use->tag) {
+      case USE_TREE_RENAME:
+        // printf("rename: ");
+        // str_print(use->rename.str);
+        str = use->rename.str;
+        __attribute__((fallthrough));
+      case USE_TREE_LEAF:
+        // printf("inserting ");
+        // str_print(str);
+
+        if (str_eq_parts(str, "mod", 3) && parent_name.len > 0) {
+          str = parent_name;
+          b = &parent->bindings[0];
         }
-      } else {
-        err->tag = OO_ERR_DUP_ID_ITEM_USE;
-        err->dup_item_use = use;
-        return;
-      }
-      break;
-    case USE_TREE_BRANCH:
-      if (b->tag != BINDING_NS) {
-        err->tag = OO_ERR_INVALID_BRANCH;
-        err->invalid_branch = use;
-        return;
-      }
 
-      count = sb_count(use->branch);
-      for (int i = 0; i < count; i++) {
-        resolve_use(&use->branch[i], pub, ns, b->ns, cx, err);
-        if (err->tag != OO_ERR_NONE) {
+        if (raxInsert(ns->bindings_by_sid, str.start, str.len, b, NULL)) {
+          if (pub && ns->tag == NS_FILE) {
+            raxInsert(ns->pub_bindings_by_sid, str.start, str.len, b, NULL);
+          }
+        } else {
+          err->tag = OO_ERR_DUP_ID_ITEM_USE;
+          err->dup_item_use = use;
           return;
         }
-      }
-      break;
-  }
+        break;
+      case USE_TREE_BRANCH:
+        if (b->tag != BINDING_NS) {
+          err->tag = OO_ERR_INVALID_BRANCH;
+          err->invalid_branch = use;
+          return;
+        }
+
+        count = sb_count(use->branch);
+        for (int i = 0; i < count; i++) {
+          resolve_use(&use->branch[i], pub, ns, b->ns, str, cx, err);
+          if (err->tag != OO_ERR_NONE) {
+            return;
+          }
+        }
+        break;
+    }
 }
 
 static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
@@ -390,7 +407,7 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
         // printf("hi: %s\n", asg->path);
         // str_print(asg->items[i].use.str);
         // printf("%zu\n", i);
-        resolve_use(&asg->items[i].use, asg->items[i].pub, &asg->ns, &asg->ns, cx, err);
+        resolve_use(&asg->items[i].use, asg->items[i].pub, &asg->ns, &asg->ns, str_new(NULL, 0), cx, err);
         if (err->tag != OO_ERR_NONE) {
           return;
         }

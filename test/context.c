@@ -197,8 +197,8 @@ void test_parsing(void) {
     oo_cx_coarse_bindings(&cx, &err);
     assert(err.tag == OO_ERR_NONE);
 
-    // TODO test multiple use branches and the mod keyword inside branches
     // TODO test builtin namespaces: bool::and, u16::as_u32, etc.
+    // TODO test sum types
 
     raxFree(features);
     oo_cx_free(&cx);
