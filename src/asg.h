@@ -143,7 +143,7 @@ typedef struct AsgRepeat {
 
 // Root node of the asg.
 typedef struct AsgFile {
-  const char *path;
+  const char *path; // owning
   Str str; // not owning
   AsgItem *items; // owning stretchy buffer
   AsgMeta **attrs; // owning stretchy buffer of owning stretchy buffers, same length as items
@@ -186,6 +186,7 @@ typedef enum {
 } TagUseTree;
 
 typedef struct AsgUseTree {
+  AsgFile *asg;
   Str str;
   TagUseTree tag;
   AsgSid sid;
@@ -550,6 +551,7 @@ typedef struct AsgItemFfiVal {
 } AsgItemFfiVal;
 
 typedef struct AsgItem {
+  AsgFile *asg;
   Str str;
   TagItem tag;
   bool pub; // ignored for ffi_includes

@@ -6,12 +6,26 @@
 #include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "context.h"
 #include "parser.h"
 #include "rax.h"
 #include "cc.h"
 #include "stretchy_buffer.h"
+#include "util.h"
+
+static bool is_ns_uninitialized(AsgNS *ns) {
+  return ns->bindings == NULL;
+}
+
+static bool is_ns_fully_initialized(AsgNS *ns) {
+  return (uint) sb_count(ns->bindings) == raxSize(ns->bindings_by_sid);
+}
+
+static bool is_ns_initializing(AsgNS *ns) {
+  return !is_ns_uninitialized(ns) && !is_ns_fully_initialized(ns);
+}
 
 void free_ns(AsgNS ns) {
   if (ns.bindings_by_sid != NULL) {
@@ -37,6 +51,7 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
   DIR *dp;
   struct dirent *ep;
   size_t path_len = strlen(path);
+  char *inner_path;
 
   // printf("handle dir: %s\n", path);
 
@@ -47,8 +62,15 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
     return;
   }
 
-  char *inner_path;
+  size_t dir_len = 0;
+  while ((ep = readdir(dp))) {
+    dir_len += 1;
+  }
+  rewinddir(dp);
+  dir_len -= 2; // . and ..
+  sb_add(ns->bindings, (int) dir_len);
 
+  size_t i = 0;
   while ((ep = readdir(dp))) {
     if (
       (strlen(ep->d_name) == 1 && strcmp(ep->d_name, ".") == 0) ||
@@ -56,13 +78,14 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
     ) {
       continue;
     }
-    AsgBinding *inner_binding = sb_add(ns->bindings, 1);
+    AsgBinding *inner_binding = &ns->bindings[i];
+    i += 1;
     inner_path = malloc(path_len + 1 + strlen(ep->d_name) + 1);
     strcpy(inner_path, path);
     inner_path[path_len] = '/';
     strcpy(inner_path + (path_len + 1), ep->d_name);
 
-    // printf("ep->d_name: %s\n", ep->d_name);
+    // printf("  ep->d_name: %s\n", ep->d_name);
 
     AsgNS *dir_ns;
     FILE *f;
@@ -79,9 +102,14 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
 
         inner_binding->tag = BINDING_NS;
         inner_binding->ns = dir_ns;
-        raxInsert(ns->bindings_by_sid, inner_path, strlen(inner_path), (void *) inner_binding, NULL);
+        // printf("    %s\n", inner_path);
+        // printf("    %s\n", ep->d_name);
+        raxInsert(ns->bindings_by_sid, ep->d_name, strlen(ep->d_name), (void *) inner_binding, NULL);
+        // raxShow(ns->bindings_by_sid);
+        // printf("\n");
 
         parse_handle_dir(inner_path, dir_ns, cx, err, features);
+        free(inner_path);
         if (err->tag != OO_ERR_NONE) {
           goto done;
         }
@@ -150,8 +178,9 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
         err->file = inner_path;
         goto done;
     }
-    free(inner_path);
   }
+
+  assert(is_ns_fully_initialized(ns));
 
   done:
     closedir(dp);
@@ -166,16 +195,16 @@ void oo_cx_parse(OoContext *cx, OoError *err, rax *features) {
   cx->dirs[0]->pub_bindings_by_sid = NULL;
   cx->dirs[0]->tag = NS_MODS;
 
-  parse_handle_dir(cx->mods, cx->dirs[0], cx, err, features);
-  if (err->tag != OO_ERR_NONE) {
-    return;
-  }
-
   cx->dirs[1] = malloc(sizeof(AsgNS));
   cx->dirs[1]->bindings = NULL;
   cx->dirs[1]->bindings_by_sid = raxNew();
   cx->dirs[1]->pub_bindings_by_sid = NULL;
   cx->dirs[1]->tag = NS_DEPS;
+
+  parse_handle_dir(cx->mods, cx->dirs[0], cx, err, features);
+  if (err->tag != OO_ERR_NONE) {
+    return;
+  }
 
   parse_handle_dir(cx->deps, cx->dirs[1], cx, err, features);
 }
@@ -203,33 +232,75 @@ void oo_cx_free(OoContext *cx) {
 }
 
 static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg);
+static void dir_coarse_bindings(OoContext *cx, OoError *err, AsgNS *dir);
+static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns, AsgNS *parent, OoContext *cx, OoError *err);
 
-// (Recursively) add all bindings from the given UseTree to the mod.
-static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns, OoContext *cx, OoError *err) {
-  AsgBinding *b = raxFind(ns->bindings_by_sid, use->sid.str.start, use->sid.str.len);
+void oo_cx_coarse_bindings(OoContext *cx, OoError *err) {
+  int count = sb_count(cx->files);
+  for (int i = 0; i < count; i++) {
+    if (is_ns_uninitialized(&cx->files[i]->ns)) {
+      file_coarse_bindings(cx, err, cx->files[i]);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+    }
+  }
+}
 
-    if (b == raxNotFound) {
-      err->tag = OO_ERR_NONEXISTING_SID_USE;
-      err->nonexisting_sid_use = use;
+static void prepare_file(OoContext *cx, OoError *err, AsgFile *file) {
+  if (is_ns_initializing(&file->ns)) {
+    err->tag = OO_ERR_CYCLIC_IMPORTS;
+    err->cyclic_imports = file;
+    return;
+  } else if (is_ns_uninitialized(&file->ns)) {
+    file_coarse_bindings(cx, err, file);
+    if (err->tag != OO_ERR_NONE) {
       return;
     }
+  }
+}
 
-  if (b->tag == BINDING_NS && b->ns->tag == NS_FILE && b->ns->bindings == NULL) {
-    file_coarse_bindings(cx, err, b->ns->file);
+// (Recursively) add all bindings from the given UseTree to the mod.
+static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns /* where to put the resolved bindings */, AsgNS *parent /* where to look for the sid */, OoContext *cx, OoError *err) {
+  AsgBinding *b = raxFind(parent->bindings_by_sid, use->sid.str.start, use->sid.str.len);
+
+  // printf("resolve use for ");
+  // str_print(use->str);
+  // printf(" in %s\n", use->asg->path);
+
+  if (b == raxNotFound) {
+    err->tag = OO_ERR_NONEXISTING_SID_USE;
+    err->nonexisting_sid_use = use;
+    // printf("unfound str: ");
+    // str_print(use->sid.str);
+    // raxShow(parent->bindings_by_sid);
+    // printf("actual addr: %p\n", (void *) ns);
+    // printf("actual addr of asg: %p\n", (void *) use->asg);
+    return;
+  }
+
+  if (b->tag == BINDING_NS && b->ns->tag == NS_FILE) {
+    prepare_file(cx, err, b->ns->file);
     if (err->tag != OO_ERR_NONE) {
       return;
     }
   }
 
+  // TODO sum types?
+
   Str str = use->sid.str;
   int count;
   switch (use->tag) {
     case USE_TREE_RENAME:
+      // printf("rename: ");
+      // str_print(use->rename.str);
       str = use->rename.str;
       __attribute__((fallthrough));
-    case USE_TREE_LEAF:
+    case USE_TREE_LEAF: // TODO special handling for "mod" keyword
+      // printf("inserting ");
+      // str_print(str);
       if (raxInsert(ns->bindings_by_sid, str.start, str.len, b, NULL)) {
-        if (pub) {
+        if (pub && ns->tag == NS_FILE) {
           raxInsert(ns->pub_bindings_by_sid, str.start, str.len, b, NULL);
         }
       } else {
@@ -247,7 +318,7 @@ static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns, OoContext *cx, OoE
 
       count = sb_count(use->branch);
       for (int i = 0; i < count; i++) {
-        resolve_use(&use->branch[i], pub, ns, cx, err);
+        resolve_use(&use->branch[i], pub, ns, b->ns, cx, err);
         if (err->tag != OO_ERR_NONE) {
           return;
         }
@@ -257,84 +328,81 @@ static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns, OoContext *cx, OoE
 }
 
 static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
-    if (sb_count(asg->ns.bindings) != 0) {
-      err->tag = OO_ERR_CYCLIC_USES;
-      err->file = asg->path;
-      return;
-    }
+  // printf("file_coarse_bindings for %s\n", asg->path);
 
-    size_t count = sb_count(asg->items);
-    sb_add(asg->ns.bindings, 2 + (int) count);
-    asg->ns.bindings_by_sid = raxNew();
-    asg->ns.pub_bindings_by_sid = raxNew();
+  size_t count = sb_count(asg->items);
+  sb_add(asg->ns.bindings, 2 + (int) count);
+  asg->ns.bindings_by_sid = raxNew();
+  asg->ns.pub_bindings_by_sid = raxNew();
 
-    asg->ns.bindings[0].tag = BINDING_NS;
-    asg->ns.bindings[0].ns = cx->dirs[0];
-    raxInsert(asg->ns.bindings_by_sid, "mod", 3, &asg->ns.bindings[0], NULL);
+  asg->ns.bindings[0].tag = BINDING_NS;
+  asg->ns.bindings[0].ns = cx->dirs[0];
+  raxInsert(asg->ns.bindings_by_sid, "mod", 3, &asg->ns.bindings[0], NULL);
 
-    asg->ns.bindings[1].tag = BINDING_NS;
-    asg->ns.bindings[1].ns = cx->dirs[1];
-    raxInsert(asg->ns.bindings_by_sid, "dep", 3, &asg->ns.bindings[1], NULL);
+  asg->ns.bindings[1].tag = BINDING_NS;
+  asg->ns.bindings[1].ns = cx->dirs[1];
+  raxInsert(asg->ns.bindings_by_sid, "dep", 3, &asg->ns.bindings[1], NULL);
 
-    for (size_t i = 0; i < count; i++) {
-      Str str;
-      switch (asg->items[i].tag) {
-        case ITEM_TYPE:
-        case ITEM_VAL:
-        case ITEM_FUN:
-        case ITEM_FFI_VAL:
-          switch (asg->items[i].tag) {
-            case ITEM_TYPE:
-              str = asg->items[i].type.sid.str;
-              asg->ns.bindings[i].tag = BINDING_TYPE;
-              asg->ns.bindings[i].type = &asg->items[i];
-              break;
-            case ITEM_VAL:
-              str = asg->items[i].val.sid.str;
-              asg->ns.bindings[i].tag = BINDING_VAL;
-              asg->ns.bindings[i].val = &asg->items[i];
-              break;
-            case ITEM_FUN:
-              str = asg->items[i].fun.sid.str;
-              asg->ns.bindings[i].tag = BINDING_FUN;
-              asg->ns.bindings[i].fun = &asg->items[i];
-              break;
-            case ITEM_FFI_VAL:
-              str = asg->items[i].ffi_val.sid.str;
-              asg->ns.bindings[i].tag = BINDING_FFI_VAL;
-              asg->ns.bindings[i].ffi_val = &asg->items[i];
-              break;
-            default:
-              abort(); // unreachable
+  for (size_t i = 0; i < count; i++) {
+    Str str;
+    switch (asg->items[i].tag) {
+      case ITEM_TYPE:
+      case ITEM_VAL:
+      case ITEM_FUN:
+      case ITEM_FFI_VAL:
+        switch (asg->items[i].tag) {
+          case ITEM_TYPE:
+            str = asg->items[i].type.sid.str;
+            asg->ns.bindings[i + 2].tag = BINDING_TYPE;
+            asg->ns.bindings[i + 2].type = &asg->items[i];
+            break;
+          case ITEM_VAL:
+            str = asg->items[i].val.sid.str;
+            asg->ns.bindings[i + 2].tag = BINDING_VAL;
+            asg->ns.bindings[i + 2].val = &asg->items[i];
+            break;
+          case ITEM_FUN:
+            str = asg->items[i].fun.sid.str;
+            asg->ns.bindings[i + 2].tag = BINDING_FUN;
+            asg->ns.bindings[i + 2].fun = &asg->items[i];
+            break;
+          case ITEM_FFI_VAL:
+            str = asg->items[i].ffi_val.sid.str;
+            asg->ns.bindings[i + 2].tag = BINDING_FFI_VAL;
+            asg->ns.bindings[i + 2].ffi_val = &asg->items[i];
+            break;
+          default:
+            abort(); // unreachable
+        }
+
+        if (raxInsert(asg->ns.bindings_by_sid, str.start, str.len, &asg->ns.bindings[i + 2], NULL)) {
+          if (asg->items[i].pub) {
+            raxInsert(asg->ns.pub_bindings_by_sid, str.start, str.len, &asg->ns.bindings[i + 2], NULL);
           }
+        } else {
+          err->tag = OO_ERR_DUP_ID_ITEM;
+          err->dup_item = &asg->items[i];
+          return;
+        }
 
-          if (raxInsert(asg->ns.bindings_by_sid, str.start, str.len, &asg->ns.bindings[i], NULL)) {
-            if (asg->items[i].pub) {
-              raxInsert(asg->ns.pub_bindings_by_sid, str.start, str.len, &asg->ns.bindings[i], NULL);
-            }
-          } else {
-            err->tag = OO_ERR_DUP_ID_ITEM;
-            err->dup_item = &asg->items[i];
-            return;
-          }
-
-          break;
-        case ITEM_USE:
-          resolve_use(&asg->items[i].use, asg->items[i].pub, &asg->ns, cx, err);
-          break;
-        case ITEM_FFI_INCLUDE:
-          // noop
-          break;
-      }
-    }
-}
-
-void oo_cx_coarse_bindings(OoContext *cx, OoError *err) {
-  int count = sb_count(cx->files);
-  for (int i = 0; i < count; i++) {
-    file_coarse_bindings(cx, err, cx->files[i]);
-    if (err->tag != OO_ERR_NONE) {
-      return;
+        break;
+      case ITEM_USE:
+        // printf("hi: %s\n", asg->path);
+        // str_print(asg->items[i].use.str);
+        // printf("%zu\n", i);
+        resolve_use(&asg->items[i].use, asg->items[i].pub, &asg->ns, &asg->ns, cx, err);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+        break;
+      case ITEM_FFI_INCLUDE:
+        // noop
+        break;
     }
   }
 }
+
+// static void dir_coarse_bindings(OoContext *cx, OoError *err, AsgNS *dir) {
+//   // for each entry in the dir:
+//   //   - create an entry in the ns with the file name as key (minus the .oo extension for actual files)
+// }

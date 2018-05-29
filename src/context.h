@@ -7,12 +7,8 @@
 #include "util.h"
 
 typedef enum {
-  OO_ERR_NONE, OO_ERR_SYNTAX, OO_ERR_FILE, OO_ERR_CYCLIC_USES, OO_ERR_DUP_ID_ITEM,
+  OO_ERR_NONE, OO_ERR_SYNTAX, OO_ERR_FILE, OO_ERR_CYCLIC_IMPORTS, OO_ERR_DUP_ID_ITEM,
   OO_ERR_DUP_ID_ITEM_USE, OO_ERR_INVALID_BRANCH, OO_ERR_NONEXISTING_SID_USE
-
-  // OO_ERR_FILE, OO_ERR_IMPORT, OO_ERR_DUP_ID,
-  // OO_ERR_NONEXISTING_SID, OO_ERR_INVALID_BRANCH, OO_ERR_UNEXPECTED_DEP,
-  // OO_ERR_UNEXPECTED_MOD
 } OoErrorTag;
 
 // TODO add AsgFile, file path, and the asg node
@@ -20,7 +16,8 @@ typedef struct OoError {
   OoErrorTag tag;
   union {
     ParserError parser; // OO_ERR_SYNTAX
-    const char *file; // OO_ERR_FILE, OO_ERR_CYCLIC_USES
+    const char *file; // OO_ERR_FILE
+    AsgFile *cyclic_imports; // OO_ERR_CYCLIC_USES
     AsgItem *dup_item;
     AsgUseTree *dup_item_use;
     AsgUseTree *nonexisting_sid_use;

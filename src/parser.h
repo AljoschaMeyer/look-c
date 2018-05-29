@@ -39,8 +39,8 @@ typedef struct ParserError {
 
 size_t parse_file(const char *src, ParserError *err, AsgFile *data);
 size_t parse_meta(const char *src, ParserError *err, AsgMeta *data);
-size_t parse_item(const char *src, ParserError *err, AsgItem *data);
-size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data);
+size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg);
+size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data, AsgFile *asg);
 size_t parse_item_type(const char *src, ParserError *err, AsgItemType *data);
 size_t parse_type(const char *src, ParserError *err, AsgType *data);
 size_t parse_summand(const char *src, ParserError *err, AsgSummand *data);

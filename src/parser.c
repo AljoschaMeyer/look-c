@@ -2904,9 +2904,10 @@ size_t parse_sid_or_use_kw(const char *src, ParserError *err, AsgSid *data) {
   return t.len;
 }
 
-size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data) {
+size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data, AsgFile *asg) {
   Token t;
   err->tag = ERR_NONE;
+  data->asg = asg;
   data->str.start = src;
   size_t l = 0;
 
@@ -2934,7 +2935,7 @@ size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data) {
     if (t.tt == ID || t.tt == DEP || t.tt == MAGIC || t.tt == KW_MOD) {
       AsgUseTree *inners = NULL;
       AsgUseTree *inner = sb_add(inners, 1);
-      l += parse_use_tree(src + l, err, inner);
+      l += parse_use_tree(src + l, err, inner, asg);
       if (err->tag != ERR_NONE) {
         free_sb_use_tree(inners);
         return l;
@@ -2948,7 +2949,7 @@ size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data) {
 
       AsgUseTree *inners = NULL;
       AsgUseTree *inner = sb_add(inners, 1);
-      l += parse_use_tree(src + l, err, inner);
+      l += parse_use_tree(src + l, err, inner, asg);
       if (err->tag != ERR_NONE) {
         free_sb_use_tree(inners);
         return l;
@@ -2964,7 +2965,7 @@ size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data) {
       } else {
         while (t.tt == COMMA) {
           inner = sb_add(inners, 1);
-          l += parse_use_tree(src + l, err, inner);
+          l += parse_use_tree(src + l, err, inner, asg);
           if (err->tag != ERR_NONE) {
             free_sb_use_tree(inners);
             return l;
@@ -3016,9 +3017,10 @@ void free_sb_items(AsgItem *sb) {
   sb_free(sb);
 }
 
-size_t parse_item(const char *src, ParserError *err, AsgItem *data) {
+size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg) {
   Token t;
   err->tag = ERR_NONE;
+  data->asg = asg;
   data->str.start = src;
   size_t l = 0;
 
@@ -3034,7 +3036,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data) {
 
   switch (t.tt) {
     case USE:
-      l += parse_use_tree(src + l, err, &data->use);
+      l += parse_use_tree(src + l, err, &data->use, asg);
       if (err->tag != ERR_NONE) {
         err->tag = ERR_ITEM;
         return l;
@@ -3419,7 +3421,7 @@ size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
   }
 
   AsgItem *item = sb_add(items, 1);
-  l += parse_item(src + l, err, item);
+  l += parse_item(src + l, err, item, data);
   if (err->tag != ERR_NONE) {
     err->tag = ERR_FILE;
     free_sb_items(items);
@@ -3441,7 +3443,7 @@ size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
     }
 
     AsgItem *item = sb_add(items, 1);
-    l += parse_item(src + l, err, item);
+    l += parse_item(src + l, err, item, data);
     if (err->tag != ERR_NONE) {
       err->tag = ERR_FILE;
       free_sb_items(items);
@@ -3452,6 +3454,7 @@ size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
     t = tokenize(src + l);
   }
 
+  data->path = NULL;
   data->str.len = l;
   data->items = items;
   data->attrs = all_attrs;
@@ -3468,6 +3471,7 @@ void free_inner_ns(AsgNS ns) {
 }
 
 void free_inner_file(AsgFile data) {
+  free((char *) data.path);
   free_sb_items(data.items);
   free_sb_sb_meta(data.attrs);
 

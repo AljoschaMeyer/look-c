@@ -1354,11 +1354,12 @@ void test_meta(void) {
 }
 
 void test_use_tree(void) {
+  AsgFile *asg = NULL;
   char *src = "a";
   ParserError err;
   AsgUseTree data;
 
-  assert(parse_use_tree(src, &err, &data) == strlen(src));
+  assert(parse_use_tree(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == USE_TREE_LEAF);
@@ -1366,7 +1367,7 @@ void test_use_tree(void) {
   free_inner_use_tree(data);
 
   src = "a as b";
-  assert(parse_use_tree(src, &err, &data) == strlen(src));
+  assert(parse_use_tree(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == USE_TREE_RENAME);
@@ -1375,7 +1376,7 @@ void test_use_tree(void) {
   free_inner_use_tree(data);
 
   src = "a::b::c";
-  assert(parse_use_tree(src, &err, &data) == strlen(src));
+  assert(parse_use_tree(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == USE_TREE_BRANCH);
@@ -1387,7 +1388,7 @@ void test_use_tree(void) {
   free_inner_use_tree(data);
 
   src = "a::{a}";
-  assert(parse_use_tree(src, &err, &data) == strlen(src));
+  assert(parse_use_tree(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == USE_TREE_BRANCH);
@@ -1397,7 +1398,7 @@ void test_use_tree(void) {
   free_inner_use_tree(data);
 
   src = "super::{dep, magic, mod}";
-  assert(parse_use_tree(src, &err, &data) == strlen(src));
+  assert(parse_use_tree(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == USE_TREE_BRANCH);
@@ -1410,11 +1411,12 @@ void test_use_tree(void) {
 }
 
 void test_item(void) {
+  AsgFile *asg = NULL;
   char *src = "pub use a::b";
   ParserError err;
   AsgItem data;
 
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_USE);
@@ -1423,7 +1425,7 @@ void test_item(void) {
   free_inner_item(data);
 
   src = "use a::b";
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_USE);
@@ -1432,7 +1434,7 @@ void test_item(void) {
   free_inner_item(data);
 
   src = "type a =@ b";
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_TYPE);
@@ -1442,7 +1444,7 @@ void test_item(void) {
   free_inner_item(data);
 
   src = "val a = @b";
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_VAL);
@@ -1453,7 +1455,7 @@ void test_item(void) {
   free_inner_item(data);
 
   src = "pub val mut a = @b";
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_VAL);
@@ -1464,7 +1466,7 @@ void test_item(void) {
   free_inner_item(data);
 
   src = "fn a = () {}";
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_FUN);
@@ -1479,7 +1481,7 @@ void test_item(void) {
   free_inner_item(data);
 
   src = "fn a = <T> => (b: T) -> @c {a}";
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_FUN);
@@ -1493,7 +1495,7 @@ void test_item(void) {
   free_inner_item(data);
 
   src = "fn a = <T, U> => (b: T, d: U) -> @c {a; b}";
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_FUN);
@@ -1507,7 +1509,7 @@ void test_item(void) {
   free_inner_item(data);
 
   src = "ffi use(foo.h)";
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_FFI_INCLUDE);
@@ -1517,7 +1519,7 @@ void test_item(void) {
   free_inner_item(data);
 
   src = "ffi a: @B";
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_FFI_VAL);
@@ -1528,7 +1530,7 @@ void test_item(void) {
   free_inner_item(data);
 
   src = "pub ffi mut a: @B";
-  assert(parse_item(src, &err, &data) == strlen(src));
+  assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
   assert(data.tag == ITEM_FFI_VAL);
