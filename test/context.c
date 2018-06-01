@@ -89,8 +89,8 @@ void test_parsing(void) {
 
 int main(void) {
   test_parsing();
-  // test_duplicates();
-  // test_use_duplicates();
+  test_duplicates();
+  test_use_duplicates();
 
   return 0;
 }

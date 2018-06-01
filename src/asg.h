@@ -27,6 +27,7 @@ typedef struct AsgBlock AsgBlock;
 typedef struct AsgUseTree AsgUseTree;
 typedef struct AsgNS AsgNS;
 typedef struct AsgTypeSum AsgTypeSum;
+typedef struct AsgSummand AsgSummand;
 
 typedef enum {
   BINDING_TYPE,
@@ -34,7 +35,8 @@ typedef enum {
   BINDING_FUN,
   BINDING_FFI_VAL,
   BINDING_NS,
-  BINDING_SUM_TYPE
+  BINDING_SUM_TYPE,
+  BINDING_SUMMAND
 } TagBinding;
 
 typedef struct AsgBindingSum {
@@ -52,6 +54,7 @@ typedef struct AsgBinding {
     AsgItem *ffi_val;
     AsgNS *ns;
     AsgBindingSum sum;
+    AsgSummand *summand;
   };
 } AsgBinding;
 

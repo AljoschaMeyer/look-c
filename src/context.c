@@ -353,7 +353,7 @@ static void resolve_use(
           if (b->tag == BINDING_NS) {
             resolve_use(&use->branch[i], pub, ns, b->ns, str, cx, err);
           } else {
-            // BINDING_SUM_TYPE
+            assert(b->tag == BINDING_SUM_TYPE);
             resolve_use(&use->branch[i], pub, ns, b->sum.ns, str, cx, err);
           }
           if (err->tag != OO_ERR_NONE) {
@@ -412,14 +412,23 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
               sum->ns.bindings_by_sid = raxNew();
               sum->ns.pub_bindings_by_sid = raxNew();
               sum->ns.bindings = NULL;
-              int count = sb_count(sum->summands);
+              int count = sb_count(sum->summands) + 1;
               sb_add(sum->ns.bindings, count);
 
-              for (int j = 0; j < count; j++) {
+              sum->ns.bindings[0].tag = BINDING_SUM_TYPE;
+              sum->ns.bindings[0].sum.type = &asg->items[i];
+              sum->ns.bindings[0].sum.ns = &sum->ns;
+              raxInsert(sum->ns.bindings_by_sid, "mod", 3, (void *) &sum->ns.bindings[0], NULL);
+              raxInsert(sum->ns.pub_bindings_by_sid, "mod", 3, (void *) &sum->ns.bindings[0], NULL);
+
+              for (int j = 1; j < count; j++) {
+                sum->ns.bindings[j].tag = BINDING_SUMMAND;
+                sum->ns.bindings[j].summand = &sum->summands[j - 1];
+
                 raxInsert(
                   sum->ns.bindings_by_sid,
-                  sum->summands[j].sid.str.start,
-                  sum->summands[j].sid.str.len,
+                  sum->summands[j - 1].sid.str.start,
+                  sum->summands[j - 1].sid.str.len,
                   &sum->ns.bindings[j],
                   NULL
                 );
@@ -427,8 +436,8 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
                 if (sum->pub) {
                   raxInsert(
                     sum->ns.pub_bindings_by_sid,
-                    sum->summands[j].sid.str.start,
-                    sum->summands[j].sid.str.len,
+                    sum->summands[j - 1].sid.str.start,
+                    sum->summands[j - 1].sid.str.len,
                     &sum->ns.bindings[j],
                     NULL
                   );
