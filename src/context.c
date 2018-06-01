@@ -15,6 +15,35 @@
 #include "stretchy_buffer.h"
 #include "util.h"
 
+void err_print(OoError *err) {
+  switch (err->tag) {
+    case OO_ERR_NONE:
+      printf("%s\n", "no error");
+      break;
+    case OO_ERR_SYNTAX:
+      printf("%s\n", "syntax error");
+      break;
+    case OO_ERR_FILE:
+      printf("%s\n", "file error");
+      break;
+    case OO_ERR_CYCLIC_IMPORTS:
+      printf("%s\n", "cyclic imports error");
+      break;
+    case OO_ERR_DUP_ID_ITEM:
+      printf("%s\n", "duplicate item id error");
+      break;
+    case OO_ERR_DUP_ID_ITEM_USE:
+      printf("%s\n", "duplicate item id due to use error");
+      break;
+    case OO_ERR_INVALID_BRANCH:
+      printf("%s\n", "invalid branch error");
+      break;
+    case OO_ERR_NONEXISTING_SID_USE:
+      printf("%s\n", "nonexisting sid use error");
+      break;
+  }
+}
+
 static bool is_ns_uninitialized(AsgNS *ns) {
   return ns->bindings == NULL;
 }
@@ -25,18 +54,6 @@ static bool is_ns_fully_initialized(AsgNS *ns) {
 
 static bool is_ns_initializing(AsgNS *ns) {
   return !is_ns_uninitialized(ns) && !is_ns_fully_initialized(ns);
-}
-
-void free_ns(AsgNS ns) {
-  if (ns.bindings_by_sid != NULL) {
-    raxFree(ns.bindings_by_sid);
-  }
-
-  if (ns.pub_bindings_by_sid != NULL) {
-    raxFree(ns.pub_bindings_by_sid);
-  }
-
-  sb_free(ns.bindings);
 }
 
 void oo_cx_init(OoContext *cx, const char *mods, const char *deps) {
@@ -297,8 +314,6 @@ static void resolve_use(
       }
     }
 
-    // TODO sum types?
-
     Str str = use->sid.str;
     int count;
     switch (use->tag) {
@@ -327,7 +342,7 @@ static void resolve_use(
         }
         break;
       case USE_TREE_BRANCH:
-        if (b->tag != BINDING_NS) {
+        if (b->tag != BINDING_NS && b->tag != BINDING_SUM_TYPE) {
           err->tag = OO_ERR_INVALID_BRANCH;
           err->invalid_branch = use;
           return;
@@ -335,7 +350,12 @@ static void resolve_use(
 
         count = sb_count(use->branch);
         for (int i = 0; i < count; i++) {
-          resolve_use(&use->branch[i], pub, ns, b->ns, str, cx, err);
+          if (b->tag == BINDING_NS) {
+            resolve_use(&use->branch[i], pub, ns, b->ns, str, cx, err);
+          } else {
+            // BINDING_SUM_TYPE
+            resolve_use(&use->branch[i], pub, ns, b->sum.ns, str, cx, err);
+          }
           if (err->tag != OO_ERR_NONE) {
             return;
           }
@@ -370,8 +390,56 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
         switch (asg->items[i].tag) {
           case ITEM_TYPE:
             str = asg->items[i].type.sid.str;
-            asg->ns.bindings[i + 2].tag = BINDING_TYPE;
-            asg->ns.bindings[i + 2].type = &asg->items[i];
+            asg->ns.bindings[i + 2].tag = BINDING_TYPE; // later overwritten for sum types
+            asg->ns.bindings[i + 2].type = &asg->items[i]; // later overwritten for sum types
+
+            // handle sum type namespaces
+            bool is_sum = false;
+            AsgTypeSum *sum;
+
+            if (asg->items[i].type.type.tag == TYPE_SUM) {
+              is_sum = true;
+              sum = &asg->items[i].type.type.sum;
+            } else if (asg->items[i].type.type.tag == TYPE_GENERIC && asg->items[i].type.type.generic.inner->tag == TYPE_SUM) {
+              is_sum = true;
+              sum = &asg->items[i].type.type.generic.inner->sum;
+            }
+
+            if (is_sum) {
+              sum->ns.tag = NS_SUM;
+              sum->ns.sum = sum;
+
+              sum->ns.bindings_by_sid = raxNew();
+              sum->ns.pub_bindings_by_sid = raxNew();
+              sum->ns.bindings = NULL;
+              int count = sb_count(sum->summands);
+              sb_add(sum->ns.bindings, count);
+
+              for (int j = 0; j < count; j++) {
+                raxInsert(
+                  sum->ns.bindings_by_sid,
+                  sum->summands[j].sid.str.start,
+                  sum->summands[j].sid.str.len,
+                  &sum->ns.bindings[j],
+                  NULL
+                );
+
+                if (sum->pub) {
+                  raxInsert(
+                    sum->ns.pub_bindings_by_sid,
+                    sum->summands[j].sid.str.start,
+                    sum->summands[j].sid.str.len,
+                    &sum->ns.bindings[j],
+                    NULL
+                  );
+                }
+              }
+
+              asg->ns.bindings[i + 2].tag = BINDING_SUM_TYPE;
+              asg->ns.bindings[i + 2].sum.type = &asg->items[i];
+              asg->ns.bindings[i + 2].sum.ns = &sum->ns;
+            }
+
             break;
           case ITEM_VAL:
             str = asg->items[i].val.sid.str;
@@ -418,8 +486,3 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
     }
   }
 }
-
-// static void dir_coarse_bindings(OoContext *cx, OoError *err, AsgNS *dir) {
-//   // for each entry in the dir:
-//   //   - create an entry in the ns with the file name as key (minus the .oo extension for actual files)
-// }

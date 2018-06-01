@@ -976,6 +976,9 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
       data->str.len = l - leading_ws;
       data->sum.pub = pub;
       data->sum.summands = summands;
+      data->sum.ns.bindings_by_sid = NULL;
+      data->sum.ns.pub_bindings_by_sid = NULL;
+      data->sum.ns.bindings = NULL;
       return l;
     default:
       err->tag = ERR_TYPE;
@@ -1187,6 +1190,7 @@ void free_inner_type(AsgType data) {
       break;
     case TYPE_SUM:
       free_sb_summands(data.sum.summands);
+      free_ns(data.sum.ns);
       break;
     default:
       return;
@@ -3478,4 +3482,16 @@ void free_inner_file(AsgFile data) {
   if (data.ns.bindings) {
     free_inner_ns(data.ns);
   }
+}
+
+void free_ns(AsgNS ns) {
+  if (ns.bindings_by_sid != NULL) {
+    raxFree(ns.bindings_by_sid);
+  }
+
+  if (ns.pub_bindings_by_sid != NULL) {
+    raxFree(ns.pub_bindings_by_sid);
+  }
+
+  sb_free(ns.bindings);
 }

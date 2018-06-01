@@ -6,6 +6,7 @@
 #include "rax.h"
 #include "util.h"
 
+// TODO move error stuff into its own header
 typedef enum {
   OO_ERR_NONE, OO_ERR_SYNTAX, OO_ERR_FILE, OO_ERR_CYCLIC_IMPORTS, OO_ERR_DUP_ID_ITEM,
   OO_ERR_DUP_ID_ITEM_USE, OO_ERR_INVALID_BRANCH, OO_ERR_NONEXISTING_SID_USE
@@ -24,6 +25,8 @@ typedef struct OoError {
     AsgUseTree *invalid_branch;
   };
 } OoError;
+
+void err_print(OoError *err);
 
 // Owns all data related to the multiple asgs of a parser run (including the asgs themselves).
 typedef struct OoContext {

@@ -26,14 +26,21 @@ typedef struct AsgPattern AsgPattern;
 typedef struct AsgBlock AsgBlock;
 typedef struct AsgUseTree AsgUseTree;
 typedef struct AsgNS AsgNS;
+typedef struct AsgTypeSum AsgTypeSum;
 
 typedef enum {
   BINDING_TYPE,
   BINDING_VAL,
   BINDING_FUN,
   BINDING_FFI_VAL,
-  BINDING_NS
+  BINDING_NS,
+  BINDING_SUM_TYPE
 } TagBinding;
+
+typedef struct AsgBindingSum {
+  AsgItem *type;
+  AsgNS *ns;
+} AsgBindingSum;
 
 // References to other parts of the ASG.
 typedef struct AsgBinding {
@@ -44,6 +51,7 @@ typedef struct AsgBinding {
     AsgItem *fun;
     AsgItem *ffi_val;
     AsgNS *ns;
+    AsgBindingSum sum;
   };
 } AsgBinding;
 
@@ -51,10 +59,11 @@ typedef enum {
   NS_FILE,
   NS_DIR,
   NS_MODS,
-  NS_DEPS
+  NS_DEPS,
+  NS_SUM
 } TagNS;
 
-// A namespace. These are owned by AsgFiles, sum types, and by the OoContext (for
+// A namespace. These are owned by AsgFiles, sum AsgTypeSums, and by the OoContext (for
 // the mod and dep namespace, and for all directories).
 typedef struct AsgNS {
   rax *bindings_by_sid;
@@ -63,6 +72,7 @@ typedef struct AsgNS {
   TagNS tag;
   union {
     AsgFile *file;
+    AsgTypeSum *sum;
   };
 } AsgNS;
 
@@ -114,7 +124,7 @@ typedef enum {
   OP_GET,
   OP_LT,
   OP_LET,
-} AsgBinOp;
+} AsgBinOp; // TODO wrapping versions
 
 typedef enum {
   REPEAT_INT,
@@ -271,6 +281,7 @@ typedef struct AsgSummand {
 typedef struct AsgTypeSum {
   bool pub; // Whether the tags are visible (opaque type if false)
   AsgSummand *summands; // stretchy buffer
+  AsgNS ns;
 } AsgTypeSum;
 
 typedef struct AsgType {
@@ -448,7 +459,7 @@ typedef enum {
   ASSIGN_XOR,
   ASSIGN_SHIFT_L,
   ASSIGN_SHIFT_R
-} AsgAssignOp;
+} AsgAssignOp; // TODO wrapping versions
 
 typedef struct AsgExpAssign {
   AsgAssignOp op;

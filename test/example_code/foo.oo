@@ -8,3 +8,6 @@ use mod::dir::bar::qux::a as f
 use mod::dir::bar::b as g
 use mod::baz::{mod, a as h}
 use mod::dir::{mod as i, bar}
+// 
+// type j = pub | a | b(c, d) | c(a: b)
+// use j::{a, b, c as k, mod as l}
