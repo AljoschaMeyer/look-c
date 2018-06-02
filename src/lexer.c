@@ -35,9 +35,12 @@ typedef enum {
   S_HASH, // #[
   S_EQ, // = or => or ==
   S_COLON, // : or ::
-  S_PLUS, // + or +=
-  S_MINUS, // - or -= or ->
-  S_TIMES, // * or *=
+  S_PLUS, // + or += or +% or +%=
+  S_PLUS_WRAP, // +% or +%=
+  S_MINUS, // - or -= or -> or -% or -%=
+  S_MINUS_WRAP, // -% or -%=
+  S_TIMES, // * or *= or *% or *%=
+  S_TIMES_WRAP, // *% or *%=
   S_DIV, // / or /= or //
   S_MOD, // % or %=
   S_PIPE, // | or || or |=
@@ -233,8 +236,20 @@ Token tokenize(const char *src) {
         if (c == '=') {
           tt = PLUS_ASSIGN;
           goto done;
+        } else if (c == '%') {
+          s = S_PLUS_WRAP;
+          break;
         } else {
           tt = PLUS;
+          len -= 1;
+          goto done;
+        }
+      case S_PLUS_WRAP:
+        if (c == '=') {
+          tt = PLUS_WRAPPING_ASSIGN;
+          goto done;
+        } else {
+          tt = PLUS_WRAPPING;
           len -= 1;
           goto done;
         }
@@ -242,6 +257,9 @@ Token tokenize(const char *src) {
         if (c == '=') {
           tt = MINUS_ASSIGN;
           goto done;
+        } else if (c == '%') {
+          s = S_MINUS_WRAP;
+          break;
         } else if (c == '>') {
           tt = ARROW;
           goto done;
@@ -250,12 +268,33 @@ Token tokenize(const char *src) {
           len -= 1;
           goto done;
         }
+      case S_MINUS_WRAP:
+        if (c == '=') {
+          tt = MINUS_WRAPPING_ASSIGN;
+          goto done;
+        } else {
+          tt = MINUS_WRAPPING;
+          len -= 1;
+          goto done;
+        }
       case S_TIMES:
         if (c == '=') {
           tt = TIMES_ASSIGN;
           goto done;
+        } else if (c == '%') {
+          s = S_TIMES_WRAP;
+          break;
         } else {
           tt = TIMES;
+          len -= 1;
+          goto done;
+        }
+      case S_TIMES_WRAP:
+        if (c == '=') {
+          tt = TIMES_WRAPPING_ASSIGN;
+          goto done;
+        } else {
+          tt = TIMES_WRAPPING;
           len -= 1;
           goto done;
         }

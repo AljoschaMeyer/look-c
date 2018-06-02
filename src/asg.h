@@ -127,7 +127,10 @@ typedef enum {
   OP_GET,
   OP_LT,
   OP_LET,
-} AsgBinOp; // TODO wrapping versions
+  OP_WRAPPING_PLUS,
+  OP_WRAPPING_MINUS,
+  OP_WRAPPING_TIMES,
+} AsgBinOp;
 
 typedef enum {
   REPEAT_INT,
@@ -388,6 +391,7 @@ typedef enum {
   EXP_ALIGN_OF,
   EXP_NOT,
   EXP_NEGATE,
+  EXP_WRAPPING_NEGATE,
   EXP_BIN_OP,
   EXP_ASSIGN,
   EXP_VAL,
@@ -461,8 +465,11 @@ typedef enum {
   ASSIGN_OR,
   ASSIGN_XOR,
   ASSIGN_SHIFT_L,
-  ASSIGN_SHIFT_R
-} AsgAssignOp; // TODO wrapping versions
+  ASSIGN_SHIFT_R,
+  ASSIGN_WRAPPING_PLUS,
+  ASSIGN_WRAPPING_MINUS,
+  ASSIGN_WRAPPING_TIMES,
+} AsgAssignOp;
 
 typedef struct AsgExpAssign {
   AsgAssignOp op;
@@ -523,6 +530,7 @@ typedef struct AsgExp {
     AsgType *align_of;
     AsgExp *exp_not;
     AsgExp *exp_negate;
+    AsgExp *exp_wrapping_negate;
     AsgExpBinOp bin_op;
     AsgExpAssign assign;
     AsgPattern val;

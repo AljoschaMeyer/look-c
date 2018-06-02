@@ -870,6 +870,17 @@ void test_exp(void) {
   assert(data.exp_negate->tag == EXP_REF);
   free_inner_exp(data);
 
+  src = " -%@a";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_WRAPPING_NEGATE);
+  assert(data.str.len == strlen(src) - 1);
+  assert(data.str.start == src + 1);
+  assert(data.exp_wrapping_negate->str.start == src + 3);
+  assert(data.exp_wrapping_negate->str.len == 2);
+  assert(data.exp_wrapping_negate->tag == EXP_REF);
+  free_inner_exp(data);
+
   src = " val a";
   assert(parse_exp(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
@@ -1256,6 +1267,17 @@ void test_exp(void) {
   assert(data.bin_op.rhs->tag == EXP_REF);
   free_inner_exp(data);
 
+  src = " (@a) +% @b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BIN_OP);
+  assert(data.str.len == strlen(src) - 1);
+  assert(data.str.start == src + 1);
+  assert(data.bin_op.op == OP_WRAPPING_PLUS);
+  assert(data.bin_op.lhs->tag == EXP_PRODUCT_ANON);
+  assert(data.bin_op.rhs->tag == EXP_REF);
+  free_inner_exp(data);
+
   src = " (@a) < @b";
   assert(parse_exp(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
@@ -1285,6 +1307,17 @@ void test_exp(void) {
   assert(data.str.len == strlen(src) - 1);
   assert(data.str.start == src + 1);
   assert(data.assign.op == ASSIGN_PLUS);
+  assert(data.assign.lhs->tag == EXP_PRODUCT_ANON);
+  assert(data.assign.rhs->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = " (@a) +%= @b";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_ASSIGN);
+  assert(data.str.len == strlen(src) - 1);
+  assert(data.str.start == src + 1);
+  assert(data.assign.op == ASSIGN_WRAPPING_PLUS);
   assert(data.assign.lhs->tag == EXP_PRODUCT_ANON);
   assert(data.assign.rhs->tag == EXP_REF);
   free_inner_exp(data);

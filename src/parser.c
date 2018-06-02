@@ -166,8 +166,17 @@ size_t parse_bin_op(const char *src, ParserError *err, AsgBinOp *op) {
     case PLUS:
       *op = OP_PLUS;
       return l;
+    case PLUS_WRAPPING:
+      *op = OP_WRAPPING_PLUS;
+      return l;
     case MINUS:
       *op = OP_MINUS;
+      return l;
+    case MINUS_WRAPPING:
+      *op = OP_WRAPPING_MINUS;
+      return l;
+    case TIMES_WRAPPING:
+      *op = OP_WRAPPING_TIMES;
       return l;
     case TIMES:
       *op = OP_TIMES;
@@ -245,11 +254,20 @@ size_t parse_assign_op(const char *src, ParserError *err, AsgAssignOp *op) {
     case PLUS_ASSIGN:
       *op = ASSIGN_PLUS;
       return l;
+    case PLUS_WRAPPING_ASSIGN:
+      *op = ASSIGN_WRAPPING_PLUS;
+      return l;
     case MINUS_ASSIGN:
       *op = ASSIGN_MINUS;
       return l;
+    case MINUS_WRAPPING_ASSIGN:
+      *op = ASSIGN_WRAPPING_MINUS;
+      return l;
     case TIMES_ASSIGN:
       *op = ASSIGN_TIMES;
+      return l;
+    case TIMES_WRAPPING_ASSIGN:
+      *op = ASSIGN_WRAPPING_TIMES;
       return l;
     case DIV_ASSIGN:
       *op = ASSIGN_TIMES;
@@ -2097,6 +2115,17 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
       data->str.len = l - leading_ws;
       data->exp_negate = inner_negate;
       return l;
+    case MINUS_WRAPPING:
+      l += t.len;
+      AsgExp *inner_wrapping_negate = malloc(sizeof(AsgExp));
+      l += parse_exp(src + l, err, inner_wrapping_negate);
+      if (err->tag != ERR_NONE) {
+        free(inner_wrapping_negate);
+      }
+      data->tag = EXP_WRAPPING_NEGATE;
+      data->str.len = l - leading_ws;
+      data->exp_wrapping_negate = inner_wrapping_negate;
+      return l;
     case VAL:
       l += t.len;
       l += parse_pattern(src + l, err, &data->val);
@@ -2609,8 +2638,11 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
         t = tokenize(src + l);
         break;
       case PLUS:
+      case PLUS_WRAPPING:
       case MINUS:
+      case MINUS_WRAPPING:
       case TIMES:
+      case TIMES_WRAPPING:
       case DIV:
       case MOD:
       case PIPE:
@@ -2648,8 +2680,11 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
         t = tokenize(src + l);
         break;
       case PLUS_ASSIGN:
+      case PLUS_WRAPPING_ASSIGN:
       case MINUS_ASSIGN:
+      case MINUS_WRAPPING_ASSIGN:
       case TIMES_ASSIGN:
+      case TIMES_WRAPPING_ASSIGN:
       case DIV_ASSIGN:
       case MOD_ASSIGN:
       case XOR_ASSIGN:
@@ -2783,6 +2818,10 @@ void free_inner_exp(AsgExp data) {
     case EXP_NEGATE:
       free_inner_exp(*data.exp_negate);
       free(data.exp_negate);
+      break;
+    case EXP_WRAPPING_NEGATE:
+      free_inner_exp(*data.exp_wrapping_negate);
+      free(data.exp_wrapping_negate);
       break;
     case EXP_VAL:
       free_inner_pattern(data.val);
