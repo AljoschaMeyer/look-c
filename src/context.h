@@ -8,21 +8,26 @@
 
 // TODO move error stuff into its own header
 typedef enum {
-  OO_ERR_NONE, OO_ERR_SYNTAX, OO_ERR_FILE, OO_ERR_CYCLIC_IMPORTS, OO_ERR_DUP_ID_ITEM,
-  OO_ERR_DUP_ID_ITEM_USE, OO_ERR_INVALID_BRANCH, OO_ERR_NONEXISTING_SID_USE
+  OO_ERR_NONE, OO_ERR_SYNTAX, OO_ERR_FILE, OO_ERR_CYCLIC_IMPORTS,
+  OO_ERR_DUP_ID_ITEM, OO_ERR_DUP_ID_ITEM_USE, OO_ERR_INVALID_BRANCH,
+  OO_ERR_NONEXISTING_SID_USE, OO_ERR_NONEXISTING_SID, OO_ERR_ID_NOT_A_NS,
+  OO_ERR_ID_NOT_IN_NS
 } OoErrorTag;
 
-// TODO add AsgFile, file path, and the asg node
 typedef struct OoError {
   OoErrorTag tag;
+  AsgFile *asg;
   union {
     ParserError parser; // OO_ERR_SYNTAX
     const char *file; // OO_ERR_FILE
-    AsgFile *cyclic_imports; // OO_ERR_CYCLIC_USES
+    AsgSid *cyclic_import; // OO_ERR_CYCLIC_IMPORTS
     AsgItem *dup_item;
     AsgUseTree *dup_item_use;
-    AsgUseTree *nonexisting_sid_use;
     AsgUseTree *invalid_branch;
+    AsgUseTree *nonexisting_sid_use;
+    AsgSid *nonexisting_sid;
+    AsgSid *id_not_a_ns;
+    AsgSid *id_not_in_ns;
   };
 } OoError;
 
@@ -55,6 +60,9 @@ void oo_cx_parse(OoContext *cx, OoError *err, rax *features);
 
 // Resolves the top-level bindings of all files.
 void oo_cx_coarse_bindings(OoContext *cx, OoError *err);
+
+// Resolves the bindings inside the items of all files.
+void oo_cx_fine_bindings(OoContext *cx, OoError *err);
 
 // Frees all data owned by the context, including all parsed files and all namespaces.
 // The `mods` and `deps` directory paths are not freed.

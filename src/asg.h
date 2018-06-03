@@ -30,13 +30,15 @@ typedef struct AsgTypeSum AsgTypeSum;
 typedef struct AsgSummand AsgSummand;
 
 typedef enum {
+  BINDING_NONE,
   BINDING_TYPE,
   BINDING_VAL,
   BINDING_FUN,
   BINDING_FFI_VAL,
   BINDING_NS,
   BINDING_SUM_TYPE,
-  BINDING_SUMMAND
+  BINDING_SUMMAND,
+  BINDING_TYPE_VAR
 } TagBinding;
 
 typedef struct AsgBindingSum {
@@ -47,6 +49,7 @@ typedef struct AsgBindingSum {
 // References to other parts of the ASG.
 typedef struct AsgBinding {
   TagBinding tag;
+  bool private; // If false, the non-public information of the binding should not be accessed.
   union {
     AsgItem *type;
     AsgItem *val;
@@ -84,6 +87,7 @@ void free_ns(AsgNS ns);
 // A simple identifier
 typedef struct AsgSid {
   Str str;
+  AsgBinding binding;
 } AsgSid;
 
 typedef struct AsgId {

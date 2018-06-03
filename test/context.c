@@ -59,7 +59,7 @@ void test_use_duplicates(void) {
   oo_cx_free(&cx);
 }
 
-void test_parsing(void) {
+void test_coarse_bindings(void) {
     char mods[PATH_MAX];
     getcwd(mods, sizeof(mods));
     strcat(mods, "/test/example_code");
@@ -79,18 +79,44 @@ void test_parsing(void) {
 
     oo_cx_coarse_bindings(&cx, &err);
     assert(err.tag == OO_ERR_NONE);
-    // err_print(&err);
 
-    // TODO test builtin namespaces: bool::and, u16::as_u32, etc.
+    raxFree(features);
+    oo_cx_free(&cx);
+}
+
+void test_fine_bindings(void) {
+    char mods[PATH_MAX];
+    getcwd(mods, sizeof(mods));
+    strcat(mods, "/test/example_bindings");
+    char deps[PATH_MAX];
+    getcwd(deps, sizeof(deps));
+    strcat(deps, "/test/example_deps");
+
+    rax *features = raxNew();
+    OoError err;
+    err.tag = OO_ERR_NONE;
+    OoContext cx;
+    oo_cx_init(&cx, mods, deps);
+
+    oo_cx_parse(&cx, &err, features);
+    assert(err.tag == OO_ERR_NONE);
+
+    oo_cx_coarse_bindings(&cx, &err);
+    assert(err.tag == OO_ERR_NONE);
+
+    oo_cx_fine_bindings(&cx, &err);
+    err_print(&err);
+    assert(err.tag == OO_ERR_NONE);
 
     raxFree(features);
     oo_cx_free(&cx);
 }
 
 int main(void) {
-  test_parsing();
+  test_coarse_bindings();
   test_duplicates();
   test_use_duplicates();
+  test_fine_bindings();
 
   return 0;
 }

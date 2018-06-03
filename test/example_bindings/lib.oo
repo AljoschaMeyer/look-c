@@ -1,0 +1,5 @@
+type A = <B> => (B, C, Bool)
+
+type B = I32
+
+type C = U64

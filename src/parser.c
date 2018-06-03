@@ -25,6 +25,8 @@ size_t parse_id(const char *src, ParserError *err, AsgId *data) {
       kw = true;
       sid->str.start = data->str.start;
       sid->str.len = t.token_len;
+      sid->binding.tag = BINDING_NONE;
+      sid->binding.private = false;
       l = t.len;
       break;
     default:
@@ -69,6 +71,8 @@ size_t parse_sid(const char *src, ParserError *err, AsgSid *data) {
   Token t = tokenize(src);
   size_t leading_ws = t.len - t.token_len;
   data->str.start = src + leading_ws;
+  data->binding.tag = BINDING_NONE;
+  data->binding.private = false;
 
   if (t.tt != ID) {
     err->tag = ERR_SID;

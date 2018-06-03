@@ -15,6 +15,26 @@
 #include "stretchy_buffer.h"
 #include "util.h"
 
+static void print_location(Str loc, Str file) {
+  size_t line = 0;
+  size_t col = 0;
+
+  for (size_t i = 0; file.start + i != loc.start; i++) {
+    if (i > file.len) {
+      abort();
+    }
+
+    if (file.start[i] == '\n') {
+      line += 1;
+      col = 0;
+    } else {
+      col += 1;
+    }
+  }
+
+  printf("line %zu, col %zu\n", line, col);
+}
+
 void err_print(OoError *err) {
   switch (err->tag) {
     case OO_ERR_NONE:
@@ -40,6 +60,58 @@ void err_print(OoError *err) {
       break;
     case OO_ERR_NONEXISTING_SID_USE:
       printf("%s\n", "nonexisting sid use error");
+      break;
+    case OO_ERR_NONEXISTING_SID:
+      printf("%s\n", "nonexisting sid error");
+      break;
+    case OO_ERR_ID_NOT_A_NS:
+      printf("%s\n", "id is not a namespace error");
+      break;
+    case OO_ERR_ID_NOT_IN_NS:
+      printf("%s\n", "id is not in namespace error");
+      break;
+  }
+
+  if (err->tag != OO_ERR_NONE && err->tag != OO_ERR_SYNTAX && err->tag != OO_ERR_FILE) {
+    printf("In file %s\n", err->asg->path);
+  }
+
+  switch (err->tag) {
+    case OO_ERR_NONE:
+    case OO_ERR_SYNTAX:
+    case OO_ERR_FILE:
+      break;
+    case OO_ERR_CYCLIC_IMPORTS:
+      print_location(err->cyclic_import->str, err->asg->str);
+      str_print(err->cyclic_import->str);
+      break;
+    case OO_ERR_DUP_ID_ITEM:
+      print_location(err->dup_item->str, err->asg->str);
+      str_print(err->dup_item->str);
+      break;
+    case OO_ERR_DUP_ID_ITEM_USE:
+      print_location(err->dup_item_use->str, err->asg->str);
+      str_print(err->dup_item_use->str);
+      break;
+    case OO_ERR_INVALID_BRANCH:
+      print_location(err->invalid_branch->str, err->asg->str);
+      str_print(err->invalid_branch->str);
+      break;
+    case OO_ERR_NONEXISTING_SID_USE:
+      print_location(err->nonexisting_sid_use->str, err->asg->str);
+      str_print(err->nonexisting_sid_use->str);
+      break;
+    case OO_ERR_NONEXISTING_SID:
+      print_location(err->nonexisting_sid->str, err->asg->str);
+      str_print(err->nonexisting_sid->str);
+      break;
+    case OO_ERR_ID_NOT_A_NS:
+      print_location(err->id_not_a_ns->str, err->asg->str);
+      str_print(err->id_not_a_ns->str);
+      break;
+    case OO_ERR_ID_NOT_IN_NS:
+      print_location(err->id_not_in_ns->str, err->asg->str);
+      str_print(err->id_not_in_ns->str);
       break;
   }
 }
@@ -88,6 +160,7 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
   sb_add(ns->bindings, (int) dir_len + 1); // ns->bindings[0] is pointer to self
 
   ns->bindings[0].tag = BINDING_NS;
+  ns->bindings[0].private = true;
   ns->bindings[0].ns = ns;
   raxInsert(ns->bindings_by_sid, "mod", 3, (void *) &ns->bindings[0], NULL);
 
@@ -122,7 +195,9 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
         dir_ns->tag = NS_DIR;
 
         inner_binding->tag = BINDING_NS;
+        inner_binding->private = true;
         inner_binding->ns = dir_ns;
+
         // printf("    %s\n", inner_path);
         // printf("    %s\n", ep->d_name);
         raxInsert(ns->bindings_by_sid, ep->d_name, strlen(ep->d_name), (void *) inner_binding, NULL);
@@ -191,6 +266,7 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
         oo_filter_cc(asg, features);
 
         inner_binding->tag = BINDING_NS;
+        inner_binding->private = false;
         inner_binding->ns = &asg->ns;
         raxInsert(ns->bindings_by_sid, ep->d_name, strlen(ep->d_name) - 3 /* removes the .oo extension*/, (void *) inner_binding, NULL);
         break;
@@ -254,7 +330,7 @@ void oo_cx_free(OoContext *cx) {
 
 static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg);
 static void dir_coarse_bindings(OoContext *cx, OoError *err, AsgNS *dir);
-static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns, AsgNS *parent, Str parent_name, OoContext *cx, OoError *err);
+static void resolve_use(AsgUseTree *use, bool pub, AsgNS *ns, AsgNS *parent, Str parent_name, OoContext *cx, OoError *err, AsgFile *asg);
 
 void oo_cx_coarse_bindings(OoContext *cx, OoError *err) {
   int count = sb_count(cx->files);
@@ -268,10 +344,11 @@ void oo_cx_coarse_bindings(OoContext *cx, OoError *err) {
   }
 }
 
-static void prepare_file(OoContext *cx, OoError *err, AsgFile *file) {
+static void prepare_file(OoContext *cx, OoError *err, AsgFile *file, AsgSid *sid) {
   if (is_ns_initializing(&file->ns)) {
     err->tag = OO_ERR_CYCLIC_IMPORTS;
-    err->cyclic_imports = file;
+    err->cyclic_import = sid;
+    err->asg = file;
     return;
   } else if (is_ns_uninitialized(&file->ns)) {
     file_coarse_bindings(cx, err, file);
@@ -289,7 +366,8 @@ static void resolve_use(
   AsgNS *parent, /* where to look for the sid */
   Str parent_name,
   OoContext *cx,
-  OoError *err) {
+  OoError *err,
+  AsgFile *asg) {
     AsgBinding *b = raxFind(parent->bindings_by_sid, use->sid.str.start, use->sid.str.len);
 
     // printf("resolve use for ");
@@ -298,6 +376,7 @@ static void resolve_use(
 
     if (b == raxNotFound) {
       err->tag = OO_ERR_NONEXISTING_SID_USE;
+      err->asg = asg;
       err->nonexisting_sid_use = use;
       // printf("unfound str: ");
       // str_print(use->sid.str);
@@ -308,7 +387,7 @@ static void resolve_use(
     }
 
     if (b->tag == BINDING_NS && b->ns->tag == NS_FILE) {
-      prepare_file(cx, err, b->ns->file);
+      prepare_file(cx, err, b->ns->file, &use->sid);
       if (err->tag != OO_ERR_NONE) {
         return;
       }
@@ -331,12 +410,16 @@ static void resolve_use(
           b = &parent->bindings[0];
         }
 
-        if (raxInsert(ns->bindings_by_sid, str.start, str.len, b, NULL)) {
-          if (pub && ns->tag == NS_FILE) {
-            raxInsert(ns->pub_bindings_by_sid, str.start, str.len, b, NULL);
+        memcpy(&use->sid.binding, b, sizeof(AsgBinding));
+        use->sid.binding.private = false;
+
+        if (raxInsert(ns->bindings_by_sid, str.start, str.len, &use->sid.binding, NULL)) {
+          if (pub && ns->tag != NS_DIR) {
+            raxInsert(ns->pub_bindings_by_sid, str.start, str.len, &use->sid.binding, NULL);
           }
         } else {
           err->tag = OO_ERR_DUP_ID_ITEM_USE;
+          err->asg = asg;
           err->dup_item_use = use;
           return;
         }
@@ -344,6 +427,7 @@ static void resolve_use(
       case USE_TREE_BRANCH:
         if (b->tag != BINDING_NS && b->tag != BINDING_SUM_TYPE) {
           err->tag = OO_ERR_INVALID_BRANCH;
+          err->asg = asg;
           err->invalid_branch = use;
           return;
         }
@@ -351,10 +435,10 @@ static void resolve_use(
         count = sb_count(use->branch);
         for (int i = 0; i < count; i++) {
           if (b->tag == BINDING_NS) {
-            resolve_use(&use->branch[i], pub, ns, b->ns, str, cx, err);
+            resolve_use(&use->branch[i], pub, ns, b->ns, str, cx, err, asg);
           } else {
             assert(b->tag == BINDING_SUM_TYPE);
-            resolve_use(&use->branch[i], pub, ns, b->sum.ns, str, cx, err);
+            resolve_use(&use->branch[i], pub, ns, b->sum.ns, str, cx, err, asg);
           }
           if (err->tag != OO_ERR_NONE) {
             return;
@@ -373,10 +457,12 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
   asg->ns.pub_bindings_by_sid = raxNew();
 
   asg->ns.bindings[0].tag = BINDING_NS;
+  asg->ns.bindings[0].private = true;
   asg->ns.bindings[0].ns = cx->dirs[0];
   raxInsert(asg->ns.bindings_by_sid, "mod", 3, &asg->ns.bindings[0], NULL);
 
   asg->ns.bindings[1].tag = BINDING_NS;
+  asg->ns.bindings[1].private = true;
   asg->ns.bindings[1].ns = cx->dirs[1];
   raxInsert(asg->ns.bindings_by_sid, "dep", 3, &asg->ns.bindings[1], NULL);
 
@@ -391,6 +477,7 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
           case ITEM_TYPE:
             str = asg->items[i].type.sid.str;
             asg->ns.bindings[i + 2].tag = BINDING_TYPE; // later overwritten for sum types
+            asg->ns.bindings[i + 2].private = true;
             asg->ns.bindings[i + 2].type = &asg->items[i]; // later overwritten for sum types
 
             // handle sum type namespaces
@@ -423,6 +510,7 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
 
               for (int j = 1; j < count; j++) {
                 sum->ns.bindings[j].tag = BINDING_SUMMAND;
+                sum->ns.bindings[j].private = true;
                 sum->ns.bindings[j].summand = &sum->summands[j - 1];
 
                 raxInsert(
@@ -453,16 +541,19 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
           case ITEM_VAL:
             str = asg->items[i].val.sid.str;
             asg->ns.bindings[i + 2].tag = BINDING_VAL;
+            asg->ns.bindings[i + 2].private = true;
             asg->ns.bindings[i + 2].val = &asg->items[i];
             break;
           case ITEM_FUN:
             str = asg->items[i].fun.sid.str;
             asg->ns.bindings[i + 2].tag = BINDING_FUN;
+            asg->ns.bindings[i + 2].private = true;
             asg->ns.bindings[i + 2].fun = &asg->items[i];
             break;
           case ITEM_FFI_VAL:
             str = asg->items[i].ffi_val.sid.str;
             asg->ns.bindings[i + 2].tag = BINDING_FFI_VAL;
+            asg->ns.bindings[i + 2].private = true;
             asg->ns.bindings[i + 2].ffi_val = &asg->items[i];
             break;
           default:
@@ -475,6 +566,7 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
           }
         } else {
           err->tag = OO_ERR_DUP_ID_ITEM;
+          err->asg = asg;
           err->dup_item = &asg->items[i];
           return;
         }
@@ -484,7 +576,7 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
         // printf("hi: %s\n", asg->path);
         // str_print(asg->items[i].use.str);
         // printf("%zu\n", i);
-        resolve_use(&asg->items[i].use, asg->items[i].pub, &asg->ns, &asg->ns, str_new(NULL, 0), cx, err);
+        resolve_use(&asg->items[i].use, asg->items[i].pub, &asg->ns, &asg->ns, str_new(NULL, 0), cx, err, asg);
         if (err->tag != OO_ERR_NONE) {
           return;
         }
@@ -493,5 +585,162 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
         // noop
         break;
     }
+  }
+}
+
+// Nested scopes (mappings from sids to AsgBindings).
+// Allows to manipulate the stack of scopes, and to look up bindings, by
+// traversing the scopes from the innermost to the outermost one.
+// Does not own any data.
+typedef struct ScopeStack {
+  rax **scopes; // stretchy buffer of raxes of AsgBindings
+  size_t len; // how many items are on the stack
+} ScopeStack;
+
+static void ss_init(ScopeStack *ss) {
+  ss->scopes = NULL;
+  ss->len = 0;
+}
+
+static void ss_free(const ScopeStack *ss) {
+  sb_free(ss->scopes);
+}
+
+static void ss_push(ScopeStack *ss, rax *scope) {
+  if (sb_count(ss->scopes) <= (int) ss->len) {
+    sb_push(ss->scopes, scope);
+  } else {
+    ss->scopes[ss->len] = scope;
+  }
+  ss->len += 1;
+}
+
+static void ss_pop(ScopeStack *ss) {
+  ss->len -= 1;
+}
+
+// Resolve the sid to a binding, return NULL if none is found.
+static AsgBinding *ss_get(const ScopeStack *ss, Str sid) {
+  for (size_t i = ss->len; i > 0; i--) {
+    AsgBinding *b = raxFind(ss->scopes[i - 1], sid.start, sid.len);
+    if (b != raxNotFound) {
+      return b;
+    }
+  }
+  return NULL;
+}
+
+// Returns a pointer to the ns of the binding, or NULL if the binding is not one
+// to a namespace (i.e. neither BINDING_NS nor BINDING_SUM_TYPE).
+static AsgNS *binding_get_ns(AsgBinding b) {
+  switch (b.tag) {
+    case BINDING_NS:
+      return b.ns;
+    case BINDING_SUM_TYPE:
+      return b.sum.ns;
+    default:
+      return NULL;
+  }
+}
+
+static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg);
+static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgType *type, AsgFile *asg);
+static void id_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgId *id, AsgFile *asg);
+
+void oo_cx_fine_bindings(OoContext *cx, OoError *err) {
+  int count = sb_count(cx->files);
+  for (int i = 0; i < count; i++) {
+    file_fine_bindings(cx, err, cx->files[i]);
+    if (err->tag != OO_ERR_NONE) {
+      return;
+    }
+  }
+}
+
+static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
+  ScopeStack ss;
+  ss_init(&ss);
+  ss_push(&ss, asg->ns.bindings_by_sid);
+
+  size_t count = sb_count(asg->items);
+  for (size_t i = 0; i < count; i++) {
+    switch (asg->items[i].tag) {
+      case ITEM_TYPE:
+        type_fine_bindings(cx, err, &ss, &asg->items[i].type.type, asg);
+        break;
+      case ITEM_VAL:
+      case ITEM_FUN:
+      case ITEM_FFI_VAL:
+        // TODO
+        break;
+      case ITEM_USE:
+      case ITEM_FFI_INCLUDE:
+        // noop
+        break;
+    }
+
+    if (err->tag != OO_ERR_NONE) {
+      return;
+    }
+  }
+
+  ss_free(&ss);
+}
+
+static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgType *type, AsgFile *asg) {
+  switch (type->tag) {
+    case TYPE_ID:
+      id_fine_bindings(cx, err, ss, &type->id, asg);
+      break;
+      // TODO resolve id, prepare file if needed
+    default:
+      // TODO handle everything explicitly
+      break;
+  }
+  // TODO check errors after recursive calls
+}
+
+static void id_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgId *id, AsgFile *asg) {
+  AsgBinding *base = ss_get(ss, id->sids[0].str);
+  if (base == NULL) {
+    err->tag = OO_ERR_NONEXISTING_SID;
+    err->asg = asg;
+    err->nonexisting_sid = &id->sids[0];
+    return;
+  }
+
+  if (base->tag == BINDING_NS && base->ns->tag == NS_FILE) {
+    prepare_file(cx, err, base->ns->file, &id->sids[0]);
+    if (err->tag != OO_ERR_NONE) {
+      return;
+    }
+  }
+
+  id->sids[0].binding = *base;
+
+  size_t count = sb_count(id->sids);
+  for (size_t i = 1; i < count; i++) {
+    AsgNS *ns = binding_get_ns(id->sids[i - 1].binding);
+    if (ns == NULL) {
+      err->tag = OO_ERR_ID_NOT_A_NS;
+      err->asg = asg;
+      err->id_not_a_ns = &id->sids[i - 1];
+      return;
+    }
+
+    rax *scope = ns->pub_bindings_by_sid;
+    if (id->sids[i - 1].binding.private) {
+      scope = ns->bindings_by_sid;
+    }
+
+    AsgBinding *b = raxFind(scope, id->sids[i].str.start, id->sids[i].str.len);
+    if (b == raxNotFound) {
+      err->tag = OO_ERR_ID_NOT_IN_NS;
+      err->asg = asg;
+      err->id_not_in_ns = &id->sids[i];
+      return;
+    }
+
+    id->sids[i].binding = *b;
   }
 }
