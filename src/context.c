@@ -70,6 +70,9 @@ void err_print(OoError *err) {
     case OO_ERR_ID_NOT_IN_NS:
       printf("%s\n", "id is not in namespace error");
       break;
+    case OO_ERR_BINDING_NOT_TYPE:
+      printf("%s\n", "binding is not a type error");
+      break;
   }
 
   if (err->tag != OO_ERR_NONE && err->tag != OO_ERR_SYNTAX && err->tag != OO_ERR_FILE) {
@@ -112,6 +115,10 @@ void err_print(OoError *err) {
     case OO_ERR_ID_NOT_IN_NS:
       print_location(err->id_not_in_ns->str, err->asg->str);
       str_print(err->id_not_in_ns->str);
+      break;
+    case OO_ERR_BINDING_NOT_TYPE:
+      print_location(err->binding_not_type->str, err->asg->str);
+      str_print(err->binding_not_type->str);
       break;
   }
 }
@@ -452,7 +459,7 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
   // printf("file_coarse_bindings for %s\n", asg->path);
 
   size_t count = sb_count(asg->items);
-  sb_add(asg->ns.bindings, 2 + (int) count);
+  sb_add(asg->ns.bindings, 16 + (int) count); // mod, dep, and the 14 primitive types
   asg->ns.bindings_by_sid = raxNew();
   asg->ns.pub_bindings_by_sid = raxNew();
 
@@ -466,6 +473,76 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
   asg->ns.bindings[1].ns = cx->dirs[1];
   raxInsert(asg->ns.bindings_by_sid, "dep", 3, &asg->ns.bindings[1], NULL);
 
+  asg->ns.bindings[2].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[2].private = false;
+  asg->ns.bindings[2].primitive = PRIM_U8;
+  raxInsert(asg->ns.bindings_by_sid, "U8", 2, &asg->ns.bindings[2], NULL);
+
+  asg->ns.bindings[3].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[3].private = false;
+  asg->ns.bindings[3].primitive = PRIM_U16;
+  raxInsert(asg->ns.bindings_by_sid, "U16", 3, &asg->ns.bindings[3], NULL);
+
+  asg->ns.bindings[4].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[4].private = false;
+  asg->ns.bindings[4].primitive = PRIM_U32;
+  raxInsert(asg->ns.bindings_by_sid, "U32", 3, &asg->ns.bindings[4], NULL);
+
+  asg->ns.bindings[5].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[5].private = false;
+  asg->ns.bindings[5].primitive = PRIM_U64;
+  raxInsert(asg->ns.bindings_by_sid, "U64", 3, &asg->ns.bindings[5], NULL);
+
+  asg->ns.bindings[6].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[6].private = false;
+  asg->ns.bindings[6].primitive = PRIM_USIZE;
+  raxInsert(asg->ns.bindings_by_sid, "Usize", 5, &asg->ns.bindings[6], NULL);
+
+  asg->ns.bindings[7].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[7].private = false;
+  asg->ns.bindings[7].primitive = PRIM_I8;
+  raxInsert(asg->ns.bindings_by_sid, "I8", 2, &asg->ns.bindings[7], NULL);
+
+  asg->ns.bindings[8].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[8].private = false;
+  asg->ns.bindings[8].primitive = PRIM_I16;
+  raxInsert(asg->ns.bindings_by_sid, "I16", 3, &asg->ns.bindings[8], NULL);
+
+  asg->ns.bindings[9].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[9].private = false;
+  asg->ns.bindings[9].primitive = PRIM_I32;
+  raxInsert(asg->ns.bindings_by_sid, "I32", 3, &asg->ns.bindings[9], NULL);
+
+  asg->ns.bindings[10].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[10].private = false;
+  asg->ns.bindings[10].primitive = PRIM_I64;
+  raxInsert(asg->ns.bindings_by_sid, "I64", 3, &asg->ns.bindings[10], NULL);
+
+  asg->ns.bindings[11].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[11].private = false;
+  asg->ns.bindings[11].primitive = PRIM_ISIZE;
+  raxInsert(asg->ns.bindings_by_sid, "Isize", 5, &asg->ns.bindings[11], NULL);
+
+  asg->ns.bindings[12].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[12].private = false;
+  asg->ns.bindings[12].primitive = PRIM_F32;
+  raxInsert(asg->ns.bindings_by_sid, "F32", 3, &asg->ns.bindings[12], NULL);
+
+  asg->ns.bindings[13].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[13].private = false;
+  asg->ns.bindings[13].primitive = PRIM_F64;
+  raxInsert(asg->ns.bindings_by_sid, "F64", 3, &asg->ns.bindings[13], NULL);
+
+  asg->ns.bindings[14].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[14].private = false;
+  asg->ns.bindings[14].primitive = PRIM_VOID;
+  raxInsert(asg->ns.bindings_by_sid, "Void", 4, &asg->ns.bindings[14], NULL);
+
+  asg->ns.bindings[15].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[15].private = false;
+  asg->ns.bindings[15].primitive = PRIM_BOOL;
+  raxInsert(asg->ns.bindings_by_sid, "Bool", 4, &asg->ns.bindings[15], NULL);
+
   for (size_t i = 0; i < count; i++) {
     Str str;
     switch (asg->items[i].tag) {
@@ -476,9 +553,9 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
         switch (asg->items[i].tag) {
           case ITEM_TYPE:
             str = asg->items[i].type.sid.str;
-            asg->ns.bindings[i + 2].tag = BINDING_TYPE; // later overwritten for sum types
-            asg->ns.bindings[i + 2].private = true;
-            asg->ns.bindings[i + 2].type = &asg->items[i]; // later overwritten for sum types
+            asg->ns.bindings[i + 16].tag = BINDING_TYPE; // later overwritten for sum types
+            asg->ns.bindings[i + 16].private = true;
+            asg->ns.bindings[i + 16].type = &asg->items[i]; // later overwritten for sum types
 
             // handle sum type namespaces
             bool is_sum = false;
@@ -532,37 +609,37 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
                 }
               }
 
-              asg->ns.bindings[i + 2].tag = BINDING_SUM_TYPE;
-              asg->ns.bindings[i + 2].sum.type = &asg->items[i];
-              asg->ns.bindings[i + 2].sum.ns = &sum->ns;
+              asg->ns.bindings[i + 16].tag = BINDING_SUM_TYPE;
+              asg->ns.bindings[i + 16].sum.type = &asg->items[i];
+              asg->ns.bindings[i + 16].sum.ns = &sum->ns;
             }
 
             break;
           case ITEM_VAL:
             str = asg->items[i].val.sid.str;
-            asg->ns.bindings[i + 2].tag = BINDING_VAL;
-            asg->ns.bindings[i + 2].private = true;
-            asg->ns.bindings[i + 2].val = &asg->items[i];
+            asg->ns.bindings[i + 16].tag = BINDING_VAL;
+            asg->ns.bindings[i + 16].private = true;
+            asg->ns.bindings[i + 16].val = &asg->items[i];
             break;
           case ITEM_FUN:
             str = asg->items[i].fun.sid.str;
-            asg->ns.bindings[i + 2].tag = BINDING_FUN;
-            asg->ns.bindings[i + 2].private = true;
-            asg->ns.bindings[i + 2].fun = &asg->items[i];
+            asg->ns.bindings[i + 16].tag = BINDING_FUN;
+            asg->ns.bindings[i + 16].private = true;
+            asg->ns.bindings[i + 16].fun = &asg->items[i];
             break;
           case ITEM_FFI_VAL:
             str = asg->items[i].ffi_val.sid.str;
-            asg->ns.bindings[i + 2].tag = BINDING_FFI_VAL;
-            asg->ns.bindings[i + 2].private = true;
-            asg->ns.bindings[i + 2].ffi_val = &asg->items[i];
+            asg->ns.bindings[i + 16].tag = BINDING_FFI_VAL;
+            asg->ns.bindings[i + 16].private = true;
+            asg->ns.bindings[i + 16].ffi_val = &asg->items[i];
             break;
           default:
             abort(); // unreachable
         }
 
-        if (raxInsert(asg->ns.bindings_by_sid, str.start, str.len, &asg->ns.bindings[i + 2], NULL)) {
+        if (raxInsert(asg->ns.bindings_by_sid, str.start, str.len, &asg->ns.bindings[i + 16], NULL)) {
           if (asg->items[i].pub) {
-            raxInsert(asg->ns.pub_bindings_by_sid, str.start, str.len, &asg->ns.bindings[i + 2], NULL);
+            raxInsert(asg->ns.pub_bindings_by_sid, str.start, str.len, &asg->ns.bindings[i + 16], NULL);
           }
         } else {
           err->tag = OO_ERR_DUP_ID_ITEM;
@@ -646,6 +723,7 @@ static AsgNS *binding_get_ns(AsgBinding b) {
 static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg);
 static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgType *type, AsgFile *asg);
 static void id_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgId *id, AsgFile *asg);
+static void summand_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgSummand *summand, AsgFile *asg);
 
 void oo_cx_fine_bindings(OoContext *cx, OoError *err) {
   int count = sb_count(cx->files);
@@ -688,16 +766,126 @@ static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
 }
 
 static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgType *type, AsgFile *asg) {
+  size_t count;
   switch (type->tag) {
     case TYPE_ID:
       id_fine_bindings(cx, err, ss, &type->id, asg);
+      if (
+        err->tag == OO_ERR_NONE &&
+        type->id.binding.tag != BINDING_TYPE &&
+        type->id.binding.tag != BINDING_TYPE_VAR &&
+        type->id.binding.tag != BINDING_PRIMITIVE
+      ) {
+        err->tag = OO_ERR_BINDING_NOT_TYPE;
+        err->binding_not_type = &type->id;
+        return;
+      }
       break;
-      // TODO resolve id, prepare file if needed
-    default:
-      // TODO handle everything explicitly
+    case TYPE_MACRO:
+      printf("%s\n", "Macro invocations as types are not yet implemented.");
+      abort();
+      break;
+    case TYPE_PTR:
+      type_fine_bindings(cx, err, ss, type->ptr, asg);
+      break;
+    case TYPE_PTR_MUT:
+      type_fine_bindings(cx, err, ss, type->ptr_mut, asg);
+      break;
+    case TYPE_ARRAY:
+      type_fine_bindings(cx, err, ss, type->array, asg);
+      break;
+    case TYPE_PRODUCT_REPEATED:
+      type_fine_bindings(cx, err, ss, type->product_repeated.inner, asg);
+      break;
+    case TYPE_PRODUCT_ANON:
+      count = sb_count(type->product_anon);
+      for (size_t i = 0; i < count; i++) {
+        type_fine_bindings(cx, err, ss, &type->product_anon[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case TYPE_PRODUCT_NAMED:
+      count = sb_count(type->product_named.types);
+      for (size_t i = 0; i < count; i++) {
+        type_fine_bindings(cx, err, ss, &type->product_named.types[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case TYPE_FUN_ANON:
+      count = sb_count(type->fun_anon.args);
+      for (size_t i = 0; i < count; i++) {
+        type_fine_bindings(cx, err, ss, &type->fun_anon.args[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      type_fine_bindings(cx, err, ss, type->fun_anon.ret, asg);
+      break;
+    case TYPE_FUN_NAMED:
+      count = sb_count(type->fun_named.arg_types);
+      for (size_t i = 0; i < count; i++) {
+        type_fine_bindings(cx, err, ss, &type->fun_named.arg_types[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      type_fine_bindings(cx, err, ss, type->fun_named.ret, asg);
+      break;
+    case TYPE_APP_ANON:
+      id_fine_bindings(cx, err, ss, &type->app_anon.tlf, asg);
+
+      count = sb_count(type->app_anon.args);
+      for (size_t i = 0; i < count; i++) {
+        type_fine_bindings(cx, err, ss, &type->app_anon.args[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case TYPE_APP_NAMED:
+      id_fine_bindings(cx, err, ss, &type->app_named.tlf, asg);
+
+      count = sb_count(type->app_named.types);
+      for (size_t i = 0; i < count; i++) {
+        type_fine_bindings(cx, err, ss, &type->app_named.types[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case TYPE_GENERIC:
+      count = sb_count(type->generic.args);
+      AsgBinding *bindings = malloc(sizeof(AsgBinding) * count);
+      rax *r = raxNew();
+
+      for (size_t i = 0; i < count; i++) {
+        bindings[i].tag = BINDING_TYPE_VAR;
+        bindings[i].private = true;
+        bindings[i].type_var = &type->generic.args[i];
+        raxInsert(r, type->generic.args[i].str.start, type->generic.args[i].str.len, &bindings[i], NULL);
+      }
+
+      ss_push(ss, r);
+      type_fine_bindings(cx, err, ss, type->generic.inner, asg);
+      ss_pop(ss);
+
+      raxFree(r);
+      free(bindings);
+      break;
+    case TYPE_SUM:
+      count = sb_count(type->sum.summands);
+      for (size_t i = 0; i < count; i++) {
+        summand_fine_bindings(cx, err, ss, &type->sum.summands[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
       break;
   }
-  // TODO check errors after recursive calls
 }
 
 static void id_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgId *id, AsgFile *asg) {
@@ -742,5 +930,31 @@ static void id_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgId 
     }
 
     id->sids[i].binding = *b;
+  }
+
+  id->binding = id->sids[count - 1].binding;
+}
+
+static void summand_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgSummand *summand, AsgFile *asg) {
+  size_t count;
+  switch (summand->tag) {
+    case SUMMAND_ANON:
+      count = sb_count(summand->anon);
+      for (size_t i = 0; i < count; i++) {
+        type_fine_bindings(cx, err, ss, &summand->anon[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case SUMMAND_NAMED:
+      count = sb_count(summand->named.inners);
+      for (size_t i = 0; i < count; i++) {
+        type_fine_bindings(cx, err, ss, &summand->named.inners[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
   }
 }

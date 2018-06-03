@@ -28,6 +28,24 @@ typedef struct AsgUseTree AsgUseTree;
 typedef struct AsgNS AsgNS;
 typedef struct AsgTypeSum AsgTypeSum;
 typedef struct AsgSummand AsgSummand;
+typedef struct AsgSid AsgSid;
+
+typedef enum {
+  PRIM_U8,
+  PRIM_U16,
+  PRIM_U32,
+  PRIM_U64,
+  PRIM_USIZE,
+  PRIM_I8,
+  PRIM_I16,
+  PRIM_I32,
+  PRIM_I64,
+  PRIM_ISIZE,
+  PRIM_F32,
+  PRIM_F64,
+  PRIM_VOID,
+  PRIM_BOOL
+} AsgPrimitive;
 
 typedef enum {
   BINDING_NONE,
@@ -38,7 +56,8 @@ typedef enum {
   BINDING_NS,
   BINDING_SUM_TYPE,
   BINDING_SUMMAND,
-  BINDING_TYPE_VAR
+  BINDING_TYPE_VAR,
+  BINDING_PRIMITIVE
 } TagBinding;
 
 typedef struct AsgBindingSum {
@@ -58,6 +77,8 @@ typedef struct AsgBinding {
     AsgNS *ns;
     AsgBindingSum sum;
     AsgSummand *summand;
+    AsgSid *type_var;
+    AsgPrimitive primitive;
   };
 } AsgBinding;
 
@@ -93,6 +114,7 @@ typedef struct AsgSid {
 typedef struct AsgId {
   Str str;
   AsgSid *sids; // stretchy buffer
+  AsgBinding binding;
 } AsgId;
 
 typedef struct AsgMacroInv {
@@ -261,9 +283,8 @@ typedef struct AsgTypeAppAnon {
 
 typedef struct AsgTypeAppNamed {
   AsgId tlf;
-  AsgType *types;
-  AsgSid *sids; // same length as args
-  size_t args_len;
+  AsgType *types; // stretchy buffer
+  AsgSid *sids; // stretchy buffer, same length as types
 } AsgTypeAppNamed;
 
 typedef struct AsgTypeGeneric {

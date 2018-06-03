@@ -108,6 +108,25 @@ void test_fine_bindings(void) {
     err_print(&err);
     assert(err.tag == OO_ERR_NONE);
 
+    char lib[PATH_MAX];
+    getcwd(lib, sizeof(lib));
+    strcat(lib, "/test/example_bindings/lib.oo");
+    assert(strcmp(cx.files[0]->path, lib) == 0);
+
+    assert(cx.files[0]->items[0].type.type.generic.inner->product_anon[0].id.sids[0].binding.tag == BINDING_TYPE_VAR);
+    assert(
+      cx.files[0]->items[0].type.type.generic.inner->product_anon[0].id.sids[0].binding.type_var ==
+      &cx.files[0]->items[0].type.type.generic.args[0]
+    );
+
+    assert(cx.files[0]->items[0].type.type.generic.inner->product_anon[1].id.sids[0].binding.tag == BINDING_TYPE);
+    assert(
+      cx.files[0]->items[0].type.type.generic.inner->product_anon[1].id.sids[0].binding.type ==
+      &cx.files[0]->items[2]
+    );
+
+    assert(cx.files[0]->items[0].type.type.generic.inner->product_anon[2].id.sids[0].binding.tag == BINDING_PRIMITIVE);
+
     raxFree(features);
     oo_cx_free(&cx);
 }
