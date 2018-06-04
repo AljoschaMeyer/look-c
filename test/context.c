@@ -105,7 +105,6 @@ void test_fine_bindings(void) {
     assert(err.tag == OO_ERR_NONE);
 
     oo_cx_fine_bindings(&cx, &err);
-    err_print(&err);
     assert(err.tag == OO_ERR_NONE);
 
     char lib[PATH_MAX];

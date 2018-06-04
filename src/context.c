@@ -73,6 +73,15 @@ void err_print(OoError *err) {
     case OO_ERR_BINDING_NOT_TYPE:
       printf("%s\n", "binding is not a type error");
       break;
+    case OO_ERR_BINDING_NOT_EXP:
+      printf("%s\n", "binding is not an expression error");
+      break;
+    case OO_ERR_DUP_ID_SCOPE:
+      printf("%s\n", "duplicate id in scope error");
+      break;
+    case OO_ERR_BINDING_NOT_SUMMAND:
+      printf("%s\n", "binding is not a summand error");
+      break;
   }
 
   if (err->tag != OO_ERR_NONE && err->tag != OO_ERR_SYNTAX && err->tag != OO_ERR_FILE) {
@@ -119,6 +128,18 @@ void err_print(OoError *err) {
     case OO_ERR_BINDING_NOT_TYPE:
       print_location(err->binding_not_type->str, err->asg->str);
       str_print(err->binding_not_type->str);
+      break;
+    case OO_ERR_BINDING_NOT_EXP:
+      print_location(err->binding_not_exp->str, err->asg->str);
+      str_print(err->binding_not_exp->str);
+      break;
+    case OO_ERR_DUP_ID_SCOPE:
+      print_location(err->dup_id_scope, err->asg->str);
+      str_print(err->dup_id_scope);
+      break;
+    case OO_ERR_BINDING_NOT_SUMMAND:
+      print_location(err->binding_not_summand->str, err->asg->str);
+      str_print(err->binding_not_summand->str);
       break;
   }
 }
@@ -665,41 +686,94 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
   }
 }
 
+typedef struct ScopeStackFrame {
+  rax *bindings; // AsgBindings by their sid
+  AsgBinding **owned_bindings; // Stretchy buffer of owning ptrs to bindings
+  bool owns_its_rax; // Whether freeing the rax in this frame is te ScopeStack's responsibility
+} ScopeStackFrame;
+
 // Nested scopes (mappings from sids to AsgBindings).
 // Allows to manipulate the stack of scopes, and to look up bindings, by
 // traversing the scopes from the innermost to the outermost one.
 // Does not own any data.
 typedef struct ScopeStack {
-  rax **scopes; // stretchy buffer of raxes of AsgBindings
+  ScopeStackFrame *frames; // stretchy buffer of stack frames.
   size_t len; // how many items are on the stack
 } ScopeStack;
 
 static void ss_init(ScopeStack *ss) {
-  ss->scopes = NULL;
+  ss->frames = NULL;
   ss->len = 0;
 }
 
 static void ss_free(const ScopeStack *ss) {
-  sb_free(ss->scopes);
+  for (size_t i = 0; i < ss->len; i++) {
+    for (int j = 0; j < sb_count(ss->frames[i].owned_bindings); j++) {
+      free(ss->frames[i].owned_bindings[j]);
+    }
+    sb_free(ss->frames[i].owned_bindings);
+    if (ss->frames[i].owns_its_rax) {
+      raxFree(ss->frames[i].bindings);
+    }
+  }
+  sb_free(ss->frames);
 }
 
 static void ss_push(ScopeStack *ss, rax *scope) {
-  if (sb_count(ss->scopes) <= (int) ss->len) {
-    sb_push(ss->scopes, scope);
+  ScopeStackFrame f;
+  f.bindings = scope;
+  f.owned_bindings = NULL;
+  f.owns_its_rax = false;
+
+  if (sb_count(ss->frames) <= (int) ss->len) {
+    sb_push(ss->frames, f);
   } else {
-    ss->scopes[ss->len] = scope;
+    ss->frames[ss->len] = f;
+  }
+  ss->len += 1;
+}
+
+static void ss_push_owning(ScopeStack *ss, rax *scope) {
+  ScopeStackFrame f;
+  f.bindings = scope;
+  f.owned_bindings = NULL;
+  f.owns_its_rax = true;
+
+  if (sb_count(ss->frames) <= (int) ss->len) {
+    sb_push(ss->frames, f);
+  } else {
+    ss->frames[ss->len] = f;
   }
   ss->len += 1;
 }
 
 static void ss_pop(ScopeStack *ss) {
   ss->len -= 1;
+
+  for (int i = 0; i < sb_count(ss->frames[ss->len].owned_bindings); i++) {
+    free(ss->frames[ss->len].owned_bindings[i]);
+  }
+  sb_free(ss->frames[ss->len].owned_bindings);
+  if (ss->frames[ss->len].owns_its_rax) {
+    raxFree(ss->frames[ss->len].bindings);
+  }
+}
+
+// Add a binding to the current scope, free it when the scope gets popped.
+static void ss_add(OoError *err, AsgFile *asg, ScopeStack *ss, Str sid, AsgBinding *binding /* owning */) {
+  sb_push(ss->frames[ss->len - 1].owned_bindings, binding);
+  if (raxInsert(ss->frames[ss->len - 1].bindings, sid.start, sid.len, binding, NULL) == 0) {
+    err->tag = OO_ERR_DUP_ID_SCOPE;
+    err->asg = asg;
+    err->dup_id_scope = sid;
+    return;
+  }
 }
 
 // Resolve the sid to a binding, return NULL if none is found.
 static AsgBinding *ss_get(const ScopeStack *ss, Str sid) {
   for (size_t i = ss->len; i > 0; i--) {
-    AsgBinding *b = raxFind(ss->scopes[i - 1], sid.start, sid.len);
+    AsgBinding *b = raxFind(ss->frames[i - 1].bindings, sid.start, sid.len);
     if (b != raxNotFound) {
       return b;
     }
@@ -724,6 +798,92 @@ static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg);
 static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgType *type, AsgFile *asg);
 static void id_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgId *id, AsgFile *asg);
 static void summand_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgSummand *summand, AsgFile *asg);
+static void exp_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgExp *exp, AsgFile *asg);
+static void block_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgBlock *block, AsgFile *asg);
+
+// bindings and sids are pointers to stretchy buffers, bindings is an sb of owning pointers
+void add_pattern_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgPattern *p, AsgFile *asg) {
+  size_t count;
+  switch (p->tag) {
+    case PATTERN_ID:
+      if (p->id.type != NULL) {
+        type_fine_bindings(cx, err, ss, p->id.type, asg);
+      }
+
+      AsgBinding *b = malloc(sizeof(AsgBinding));
+      b->tag = BINDING_PATTERN_ID;
+      b->private = true;
+      b->pattern_id = &p->id;
+
+      ss_add(err, asg, ss, p->id.sid.str, b);
+      break;
+    case PATTERN_BLANK:
+    case PATTERN_LITERAL:
+      // noop
+      break;
+    case PATTERN_PTR:
+      add_pattern_bindings(cx, err, ss, p->ptr, asg);
+      break;
+    case PATTERN_PRODUCT_ANON:
+      count = sb_count(p->product_anon);
+      for (size_t i = 0; i < count; i++) {
+        add_pattern_bindings(cx, err, ss, &p->product_anon[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case PATTERN_PRODUCT_NAMED:
+      count = sb_count(p->product_named.inners);
+      for (size_t i = 0; i < count; i++) {
+        add_pattern_bindings(cx, err, ss, &p->product_named.inners[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case PATTERN_SUMMAND_ANON:
+      id_fine_bindings(cx, err, ss, &p->summand_anon.id, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      } else {
+        if (p->summand_anon.id.binding.tag != BINDING_SUMMAND) {
+          err->tag = OO_ERR_BINDING_NOT_SUMMAND;
+          err->binding_not_summand = &p->summand_anon.id;
+          return;
+        }
+      }
+
+      count = sb_count(p->summand_anon.fields);
+      for (size_t i = 0; i < count; i++) {
+        add_pattern_bindings(cx, err, ss, &p->summand_anon.fields[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case PATTERN_SUMMAND_NAMED:
+      id_fine_bindings(cx, err, ss, &p->summand_named.id, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      } else {
+        if (p->summand_named.id.binding.tag != BINDING_SUMMAND) {
+          err->tag = OO_ERR_BINDING_NOT_SUMMAND;
+          err->binding_not_summand = &p->summand_named.id;
+          return;
+        }
+      }
+
+      count = sb_count(p->summand_named.fields);
+      for (size_t i = 0; i < count; i++) {
+        add_pattern_bindings(cx, err, ss, &p->summand_named.fields[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+  }
+}
 
 void oo_cx_fine_bindings(OoContext *cx, OoError *err) {
   int count = sb_count(cx->files);
@@ -747,9 +907,68 @@ static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
         type_fine_bindings(cx, err, &ss, &asg->items[i].type.type, asg);
         break;
       case ITEM_VAL:
+        exp_fine_bindings(cx, err, &ss, &asg->items[i].val.exp, asg);
+        break;
       case ITEM_FUN:
+        if (sb_count(asg->items[i].fun.type_args) > 0) {
+          ss_push_owning(&ss, raxNew());
+
+          for (size_t j = 0; j < (size_t) sb_count(asg->items[i].fun.type_args); j++) {
+            AsgBinding *b = malloc(sizeof(AsgBinding));
+            b->tag = BINDING_TYPE_VAR;
+            b->private = true;
+            b->type_var = &asg->items[i].fun.type_args[j];
+            ss_add(err, asg, &ss, asg->items[i].fun.type_args[j].str, b);
+            if (err->tag != OO_ERR_NONE) {
+              ss_free(&ss);
+              return;
+            }
+          }
+        }
+
+        for (size_t j = 0; j < (size_t) sb_count(asg->items[i].fun.arg_types); j++) {
+          type_fine_bindings(cx, err, &ss, &asg->items[i].fun.arg_types[j], asg);
+          if (err->tag != OO_ERR_NONE) {
+            ss_free(&ss);
+            return;
+          }
+        }
+
+        type_fine_bindings(cx, err, &ss, &asg->items[i].fun.ret, asg);
+        if (err->tag != OO_ERR_NONE) {
+          ss_free(&ss);
+          return;
+        }
+
+        if (sb_count(asg->items[i].fun.arg_types) > 0) {
+          ss_push_owning(&ss, raxNew());
+
+          for (size_t j = 0; j < (size_t) sb_count(asg->items[i].fun.arg_types); j++) {
+            AsgBinding *b = malloc(sizeof(AsgBinding));
+            b->tag = BINDING_ARG;
+            b->private = true;
+            b->arg.sid = &asg->items[i].fun.arg_sids[j];
+            b->arg.type = &asg->items[i].fun.arg_types[j];
+            ss_add(err, asg, &ss, asg->items[i].fun.arg_sids[j].str, b);
+            if (err->tag != OO_ERR_NONE) {
+              ss_free(&ss);
+              return;
+            }
+          }
+        }
+
+        block_fine_bindings(cx, err, &ss, &asg->items[i].fun.body, asg);
+
+        if (sb_count(asg->items[i].fun.arg_types) > 0) {
+          ss_pop(&ss);
+        }
+
+        if (sb_count(asg->items[i].fun.type_args) > 0) {
+          ss_pop(&ss);
+        }
+        break;
       case ITEM_FFI_VAL:
-        // TODO
+        type_fine_bindings(cx, err, &ss, &asg->items[i].ffi_val.type, asg);
         break;
       case ITEM_USE:
       case ITEM_FFI_INCLUDE:
@@ -782,8 +1001,7 @@ static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgT
       }
       break;
     case TYPE_MACRO:
-      printf("%s\n", "Macro invocations as types are not yet implemented.");
-      abort();
+      abort(); // macros get are evaluated before binding resolution
       break;
     case TYPE_PTR:
       type_fine_bindings(cx, err, ss, type->ptr, asg);
@@ -858,23 +1076,22 @@ static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgT
       }
       break;
     case TYPE_GENERIC:
-      count = sb_count(type->generic.args);
-      AsgBinding *bindings = malloc(sizeof(AsgBinding) * count);
-      rax *r = raxNew();
+      ss_push_owning(ss, raxNew());
 
-      for (size_t i = 0; i < count; i++) {
-        bindings[i].tag = BINDING_TYPE_VAR;
-        bindings[i].private = true;
-        bindings[i].type_var = &type->generic.args[i];
-        raxInsert(r, type->generic.args[i].str.start, type->generic.args[i].str.len, &bindings[i], NULL);
+      for (size_t i = 0; i < (size_t) sb_count(type->generic.args); i++) {
+        AsgBinding *b = malloc(sizeof(AsgBinding));
+        b->tag = BINDING_TYPE_VAR;
+        b->private = true;
+        b->type_var = &type->generic.args[i];
+        ss_add(err, asg, ss, type->generic.args[i].str, b);
+        if (err->tag != OO_ERR_NONE) {
+          ss_free(ss);
+          return;
+        }
       }
 
-      ss_push(ss, r);
       type_fine_bindings(cx, err, ss, type->generic.inner, asg);
       ss_pop(ss);
-
-      raxFree(r);
-      free(bindings);
       break;
     case TYPE_SUM:
       count = sb_count(type->sum.summands);
@@ -957,4 +1174,163 @@ static void summand_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, A
       }
       break;
   }
+}
+
+static void exp_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgExp *exp, AsgFile *asg) {
+  size_t count;
+  switch (exp->tag) {
+    case EXP_ID:
+      id_fine_bindings(cx, err, ss, &exp->id, asg);
+      if (
+        err->tag == OO_ERR_NONE &&
+        exp->id.binding.tag != BINDING_VAL &&
+        exp->id.binding.tag != BINDING_FUN &&
+        exp->id.binding.tag != BINDING_FFI_VAL &&
+        exp->id.binding.tag != BINDING_SUMMAND &&
+        exp->id.binding.tag != BINDING_ARG
+      ) {
+        err->tag = OO_ERR_BINDING_NOT_EXP;
+        err->binding_not_exp = &exp->id;
+        return;
+      }
+      break;
+    case EXP_MACRO:
+      abort(); // macros are evaluated before binding resolution
+      break;
+    case EXP_LITERAL:
+      // noop
+      break;
+    case EXP_REF:
+      exp_fine_bindings(cx, err, ss, exp->ref, asg);
+      break;
+    case EXP_REF_MUT:
+      exp_fine_bindings(cx, err, ss, exp->ref_mut, asg);
+      break;
+    case EXP_DEREF:
+      exp_fine_bindings(cx, err, ss, exp->deref, asg);
+      break;
+    case EXP_DEREF_MUT:
+      exp_fine_bindings(cx, err, ss, exp->deref_mut, asg);
+      break;
+    case EXP_ARRAY:
+      exp_fine_bindings(cx, err, ss, exp->array, asg);
+      break;
+    case EXP_ARRAY_INDEX:
+      exp_fine_bindings(cx, err, ss, exp->array_index.arr, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+      exp_fine_bindings(cx, err, ss, exp->array_index.index, asg);
+      break;
+    case EXP_PRODUCT_REPEATED:
+      exp_fine_bindings(cx, err, ss, exp->product_repeated.inner, asg);
+      break;
+    case EXP_PRODUCT_ANON:
+      count = sb_count(exp->product_anon);
+      for (size_t i = 0; i < count; i++) {
+        exp_fine_bindings(cx, err, ss, &exp->product_anon[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case EXP_PRODUCT_NAMED:
+      count = sb_count(exp->product_named.inners);
+      for (size_t i = 0; i < count; i++) {
+        exp_fine_bindings(cx, err, ss, &exp->product_named.inners[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case EXP_PRODUCT_ACCESS_ANON:
+      exp_fine_bindings(cx, err, ss, exp->product_access_anon.inner, asg);
+      break;
+    case EXP_PRODUCT_ACCESS_NAMED:
+      exp_fine_bindings(cx, err, ss, exp->product_access_named.inner, asg);
+      break;
+    case EXP_FUN_APP_ANON:
+      exp_fine_bindings(cx, err, ss, exp->fun_app_anon.fun, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+
+      count = sb_count(exp->fun_app_anon.args);
+      for (size_t i = 0; i < count; i++) {
+        exp_fine_bindings(cx, err, ss, &exp->fun_app_anon.args[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case EXP_FUN_APP_NAMED:
+      exp_fine_bindings(cx, err, ss, exp->fun_app_named.fun, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+
+      count = sb_count(exp->fun_app_named.args);
+      for (size_t i = 0; i < count; i++) {
+        exp_fine_bindings(cx, err, ss, &exp->fun_app_named.args[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case EXP_CAST:
+      exp_fine_bindings(cx, err, ss, exp->cast.inner, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+
+      type_fine_bindings(cx, err, ss, exp->cast.type, asg);
+      break;
+    case EXP_SIZE_OF:
+      type_fine_bindings(cx, err, ss, exp->size_of, asg);
+      break;
+    case EXP_ALIGN_OF:
+      type_fine_bindings(cx, err, ss, exp->align_of, asg);
+      break;
+    case EXP_NOT:
+      exp_fine_bindings(cx, err, ss, exp->exp_not, asg);
+      break;
+    case EXP_NEGATE:
+      exp_fine_bindings(cx, err, ss, exp->exp_negate, asg);
+      break;
+    case EXP_WRAPPING_NEGATE:
+      exp_fine_bindings(cx, err, ss, exp->exp_wrapping_negate, asg);
+      break;
+    case EXP_BIN_OP:
+      exp_fine_bindings(cx, err, ss, exp->bin_op.lhs, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+
+      exp_fine_bindings(cx, err, ss, exp->bin_op.rhs, asg);
+      break;
+    case EXP_ASSIGN:
+      exp_fine_bindings(cx, err, ss, exp->assign.lhs, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+
+      exp_fine_bindings(cx, err, ss, exp->assign.rhs, asg);
+      break;
+    case EXP_VAL:
+      add_pattern_bindings(cx, err, ss, &exp->val, asg);
+      break;
+    default:
+      // TODO handle everything explicitly
+      abort();
+      break;
+  }
+
+}
+
+static void block_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgBlock *block, AsgFile *asg) {
+  cx->mods = "TODO remove this";
+  err->tag = OO_ERR_SYNTAX;
+  ss_free(ss);
+  block->exps = NULL;
+  asg->path = "TODO remove this";
 }

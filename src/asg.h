@@ -29,6 +29,7 @@ typedef struct AsgNS AsgNS;
 typedef struct AsgTypeSum AsgTypeSum;
 typedef struct AsgSummand AsgSummand;
 typedef struct AsgSid AsgSid;
+typedef struct AsgPatternId AsgPatternId;
 
 typedef enum {
   PRIM_U8,
@@ -57,13 +58,20 @@ typedef enum {
   BINDING_SUM_TYPE,
   BINDING_SUMMAND,
   BINDING_TYPE_VAR,
-  BINDING_PRIMITIVE
+  BINDING_PRIMITIVE,
+  BINDING_ARG,
+  BINDING_PATTERN_ID
 } TagBinding;
 
 typedef struct AsgBindingSum {
   AsgItem *type;
   AsgNS *ns;
 } AsgBindingSum;
+
+typedef struct AsgBindingArg {
+  AsgSid *sid;
+  AsgType *type;
+} AsgBindingArg;
 
 // References to other parts of the ASG.
 typedef struct AsgBinding {
@@ -79,6 +87,8 @@ typedef struct AsgBinding {
     AsgSummand *summand;
     AsgSid *type_var;
     AsgPrimitive primitive;
+    AsgBindingArg arg;
+    AsgPatternId *pattern_id;
   };
 } AsgBinding;
 
