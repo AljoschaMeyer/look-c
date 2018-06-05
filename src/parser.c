@@ -153,6 +153,12 @@ size_t parse_literal(const char *src, ParserError *err, AsgLiteral *data) {
     data->tag = LITERAL_FLOAT;
   } else if (t.tt == STRING) {
     data->tag = LITERAL_STRING;
+  } else if (t.tt == HALT) {
+    data->tag = LITERAL_HALT;
+  } else if (t.tt == KW_TRUE) {
+    data->tag = LITERAL_TRUE;
+  } else if (t.tt == KW_FALSE) {
+    data->tag = LITERAL_FALSE;
   } else {
     err->tag = ERR_LITERAL;
   }
@@ -1277,6 +1283,9 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
     case INT:
     case FLOAT:
     case STRING:
+    case HALT:
+    case KW_TRUE:
+    case KW_FALSE:
       l += parse_literal(src + l, err, &data->lit);
       data->str.len = l - leading_ws;
       data->tag = PATTERN_LITERAL;
@@ -1879,6 +1888,9 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
     case INT:
     case FLOAT:
     case STRING:
+    case HALT:
+    case KW_TRUE:
+    case KW_FALSE:
       l += parse_literal(src + l, err, &data->lit);
       data->str.len = l - leading_ws;
       data->tag = EXP_LITERAL;

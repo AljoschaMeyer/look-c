@@ -33,6 +33,9 @@ build $builddir/context.o: cc src/context.c
 build $builddir/test/context.o: cc test/context.c
 build $builddir/test/context: ld $builddir/test/context.o $builddir/context.o $builddir/parser.o $builddir/lexer.o $builddir/rax.o $builddir/cc.o $builddir/util.o
 
+build $builddir/look_to_html.o: cc src/look_to_html.c
+build $builddir/look_to_html: ld $builddir/look_to_html.o $builddir/context.o $builddir/parser.o $builddir/lexer.o $builddir/rax.o $builddir/cc.o $builddir/util.o
+
 build test_lexer: test $builddir/test/lexer
 build test_parser: test $builddir/test/parser
 build test_cc: test $builddir/test/cc

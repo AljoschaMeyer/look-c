@@ -196,6 +196,7 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
 
   ns->bindings[0].tag = BINDING_NS;
   ns->bindings[0].private = true;
+  ns->bindings[0].file = NULL;
   ns->bindings[0].ns = ns;
   raxInsert(ns->bindings_by_sid, "mod", 3, (void *) &ns->bindings[0], NULL);
 
@@ -231,6 +232,7 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
 
         inner_binding->tag = BINDING_NS;
         inner_binding->private = true;
+        inner_binding->file = NULL;
         inner_binding->ns = dir_ns;
 
         // printf("    %s\n", inner_path);
@@ -302,6 +304,7 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
 
         inner_binding->tag = BINDING_NS;
         inner_binding->private = false;
+        inner_binding->file = asg;
         inner_binding->ns = &asg->ns;
         raxInsert(ns->bindings_by_sid, ep->d_name, strlen(ep->d_name) - 3 /* removes the .oo extension*/, (void *) inner_binding, NULL);
         break;
@@ -447,6 +450,7 @@ static void resolve_use(
 
         memcpy(&use->sid.binding, b, sizeof(AsgBinding));
         use->sid.binding.private = false;
+        use->sid.binding.file = asg;
 
         if (raxInsert(ns->bindings_by_sid, str.start, str.len, &use->sid.binding, NULL)) {
           if (pub && ns->tag != NS_DIR) {
@@ -493,81 +497,97 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
 
   asg->ns.bindings[0].tag = BINDING_NS;
   asg->ns.bindings[0].private = true;
+  asg->ns.bindings[0].file = NULL;
   asg->ns.bindings[0].ns = cx->dirs[0];
   raxInsert(asg->ns.bindings_by_sid, "mod", 3, &asg->ns.bindings[0], NULL);
 
   asg->ns.bindings[1].tag = BINDING_NS;
   asg->ns.bindings[1].private = true;
+  asg->ns.bindings[1].file = NULL;
   asg->ns.bindings[1].ns = cx->dirs[1];
   raxInsert(asg->ns.bindings_by_sid, "dep", 3, &asg->ns.bindings[1], NULL);
 
   asg->ns.bindings[2].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[2].private = false;
+  asg->ns.bindings[2].file = NULL;
   asg->ns.bindings[2].primitive = PRIM_U8;
   raxInsert(asg->ns.bindings_by_sid, "U8", 2, &asg->ns.bindings[2], NULL);
 
   asg->ns.bindings[3].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[3].private = false;
+  asg->ns.bindings[3].file = NULL;
   asg->ns.bindings[3].primitive = PRIM_U16;
   raxInsert(asg->ns.bindings_by_sid, "U16", 3, &asg->ns.bindings[3], NULL);
 
   asg->ns.bindings[4].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[4].private = false;
+  asg->ns.bindings[4].file = NULL;
   asg->ns.bindings[4].primitive = PRIM_U32;
   raxInsert(asg->ns.bindings_by_sid, "U32", 3, &asg->ns.bindings[4], NULL);
 
   asg->ns.bindings[5].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[5].private = false;
+  asg->ns.bindings[5].file = NULL;
   asg->ns.bindings[5].primitive = PRIM_U64;
   raxInsert(asg->ns.bindings_by_sid, "U64", 3, &asg->ns.bindings[5], NULL);
 
   asg->ns.bindings[6].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[6].private = false;
+  asg->ns.bindings[6].file = NULL;
   asg->ns.bindings[6].primitive = PRIM_USIZE;
   raxInsert(asg->ns.bindings_by_sid, "Usize", 5, &asg->ns.bindings[6], NULL);
 
   asg->ns.bindings[7].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[7].private = false;
+  asg->ns.bindings[7].file = NULL;
   asg->ns.bindings[7].primitive = PRIM_I8;
   raxInsert(asg->ns.bindings_by_sid, "I8", 2, &asg->ns.bindings[7], NULL);
 
   asg->ns.bindings[8].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[8].private = false;
+  asg->ns.bindings[8].file = NULL;
   asg->ns.bindings[8].primitive = PRIM_I16;
   raxInsert(asg->ns.bindings_by_sid, "I16", 3, &asg->ns.bindings[8], NULL);
 
   asg->ns.bindings[9].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[9].private = false;
+  asg->ns.bindings[9].file = NULL;
   asg->ns.bindings[9].primitive = PRIM_I32;
   raxInsert(asg->ns.bindings_by_sid, "I32", 3, &asg->ns.bindings[9], NULL);
 
   asg->ns.bindings[10].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[10].private = false;
+  asg->ns.bindings[10].file = NULL;
   asg->ns.bindings[10].primitive = PRIM_I64;
   raxInsert(asg->ns.bindings_by_sid, "I64", 3, &asg->ns.bindings[10], NULL);
 
   asg->ns.bindings[11].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[11].private = false;
+  asg->ns.bindings[11].file = NULL;
   asg->ns.bindings[11].primitive = PRIM_ISIZE;
   raxInsert(asg->ns.bindings_by_sid, "Isize", 5, &asg->ns.bindings[11], NULL);
 
   asg->ns.bindings[12].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[12].private = false;
+  asg->ns.bindings[12].file = NULL;
   asg->ns.bindings[12].primitive = PRIM_F32;
   raxInsert(asg->ns.bindings_by_sid, "F32", 3, &asg->ns.bindings[12], NULL);
 
   asg->ns.bindings[13].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[13].private = false;
+  asg->ns.bindings[13].file = NULL;
   asg->ns.bindings[13].primitive = PRIM_F64;
   raxInsert(asg->ns.bindings_by_sid, "F64", 3, &asg->ns.bindings[13], NULL);
 
   asg->ns.bindings[14].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[14].private = false;
+  asg->ns.bindings[14].file = NULL;
   asg->ns.bindings[14].primitive = PRIM_VOID;
   raxInsert(asg->ns.bindings_by_sid, "Void", 4, &asg->ns.bindings[14], NULL);
 
   asg->ns.bindings[15].tag = BINDING_PRIMITIVE;
   asg->ns.bindings[15].private = false;
+  asg->ns.bindings[15].file = NULL;
   asg->ns.bindings[15].primitive = PRIM_BOOL;
   raxInsert(asg->ns.bindings_by_sid, "Bool", 4, &asg->ns.bindings[15], NULL);
 
@@ -583,6 +603,7 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
             str = asg->items[i].type.sid.str;
             asg->ns.bindings[i + 16].tag = BINDING_TYPE; // later overwritten for sum types
             asg->ns.bindings[i + 16].private = true;
+            asg->ns.bindings[i + 16].file = asg;
             asg->ns.bindings[i + 16].type = &asg->items[i]; // later overwritten for sum types
 
             // handle sum type namespaces
@@ -616,6 +637,7 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
               for (int j = 1; j < count; j++) {
                 sum->ns.bindings[j].tag = BINDING_SUMMAND;
                 sum->ns.bindings[j].private = true;
+                sum->ns.bindings[j].file = asg;
                 sum->ns.bindings[j].summand = &sum->summands[j - 1];
 
                 raxInsert(
@@ -647,18 +669,21 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
             str = asg->items[i].val.sid.str;
             asg->ns.bindings[i + 16].tag = BINDING_VAL;
             asg->ns.bindings[i + 16].private = true;
+            asg->ns.bindings[i + 16].file = asg;
             asg->ns.bindings[i + 16].val = &asg->items[i];
             break;
           case ITEM_FUN:
             str = asg->items[i].fun.sid.str;
             asg->ns.bindings[i + 16].tag = BINDING_FUN;
             asg->ns.bindings[i + 16].private = true;
+            asg->ns.bindings[i + 16].file = asg;
             asg->ns.bindings[i + 16].fun = &asg->items[i];
             break;
           case ITEM_FFI_VAL:
             str = asg->items[i].ffi_val.sid.str;
             asg->ns.bindings[i + 16].tag = BINDING_FFI_VAL;
             asg->ns.bindings[i + 16].private = true;
+            asg->ns.bindings[i + 16].file = asg;
             asg->ns.bindings[i + 16].ffi_val = &asg->items[i];
             break;
           default:
@@ -820,6 +845,7 @@ void add_pattern_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgPatter
       AsgBinding *b = malloc(sizeof(AsgBinding));
       b->tag = BINDING_PATTERN_ID;
       b->private = true;
+      b->file = asg;
       b->pattern_id = &p->id;
 
       ss_add(err, asg, ss, p->id.sid.str, b);
@@ -986,6 +1012,7 @@ static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
             AsgBinding *b = malloc(sizeof(AsgBinding));
             b->tag = BINDING_TYPE_VAR;
             b->private = true;
+            b->file = asg;
             b->type_var = &asg->items[i].fun.type_args[j];
             ss_add(err, asg, &ss, asg->items[i].fun.type_args[j].str, b);
             if (err->tag != OO_ERR_NONE) {
@@ -1016,6 +1043,7 @@ static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
             AsgBinding *b = malloc(sizeof(AsgBinding));
             b->tag = BINDING_ARG;
             b->private = true;
+            b->file = asg;
             b->arg.sid = &asg->items[i].fun.arg_sids[j];
             b->arg.type = &asg->items[i].fun.arg_types[j];
             ss_add(err, asg, &ss, asg->items[i].fun.arg_sids[j].str, b);
@@ -1152,6 +1180,7 @@ static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgT
         AsgBinding *b = malloc(sizeof(AsgBinding));
         b->tag = BINDING_TYPE_VAR;
         b->private = true;
+        b->file = asg;
         b->type_var = &type->generic.args[i];
         ss_add(err, asg, ss, type->generic.args[i].str, b);
         if (err->tag != OO_ERR_NONE) {

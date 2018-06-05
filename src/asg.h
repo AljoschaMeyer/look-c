@@ -77,6 +77,7 @@ typedef struct AsgBindingArg {
 typedef struct AsgBinding {
   TagBinding tag;
   bool private; // If false, the non-public information of the binding should not be accessed.
+  AsgFile *file; // File in which the binding is defined. NULL for directories, mod, dep, primitives, etc.
   union {
     AsgItem *type;
     AsgItem *val;
@@ -136,7 +137,10 @@ typedef struct AsgMacroInv {
 typedef enum {
   LITERAL_INT,
   LITERAL_FLOAT,
-  LITERAL_STRING
+  LITERAL_STRING,
+  LITERAL_TRUE,
+  LITERAL_FALSE,
+  LITERAL_HALT
 } TagLiteral;
 
 typedef struct AsgLiteral {

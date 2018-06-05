@@ -448,6 +448,10 @@ Token tokenize(const char *src) {
           s_align_of.start = "alignof";
           s_align_of.len = 7;
 
+          Str s_halt = str_new("halt", 4);
+          Str s_true = str_new("true", 4);
+          Str s_false = str_new("false", 5);
+
           if (str_eq(s, s_use)) {
             tt = USE;
           } else if (str_eq(s, s_mod)) {
@@ -494,6 +498,12 @@ Token tokenize(const char *src) {
             tt = SIZEOF;
           } else if (str_eq(s, s_align_of)) {
             tt = ALIGNOF;
+          } else if (str_eq(s, s_halt)) {
+            tt = HALT;
+          } else if (str_eq(s, s_true)) {
+            tt = KW_TRUE;
+          } else if (str_eq(s, s_false)) {
+            tt = KW_FALSE;
           }
 
           goto done;
