@@ -12,6 +12,8 @@ typedef enum {
   ERR_ID,
   ERR_MACRO_INV,
   ERR_LITERAL,
+  ERR_SIZE_OF,
+  ERR_ALIGN_OF,
   ERR_REPEAT,
   ERR_BIN_OP,
   ERR_ASSIGN_OP,
@@ -30,6 +32,9 @@ typedef enum {
 typedef struct ParserError {
   ParserErrorTag tag;
   TokenType tt;
+  const char *src;
+  const char *full_src;
+  const char *path;
 } ParserError;
 
 // All parser functions return how many bytes of the input they consumed.

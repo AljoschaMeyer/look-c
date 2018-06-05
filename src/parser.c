@@ -56,6 +56,7 @@ size_t parse_id(const char *src, ParserError *err, AsgId *data) {
   if (kw && sb_count(data->sids) == 1) {
     sb_free(data->sids);
     err->tag = ERR_ID;
+    err->src = src + l;
     return l;
   }
 
@@ -77,6 +78,7 @@ size_t parse_sid(const char *src, ParserError *err, AsgSid *data) {
   if (t.tt != ID) {
     err->tag = ERR_SID;
     err->tt = t.tt;
+    err->src = src;
     return t.len;
   } else {
     err->tag = ERR_NONE;
@@ -96,13 +98,14 @@ size_t parse_macro_inv(const char *src, ParserError *err, AsgMacroInv *data) {
   size_t l = t.len;
   if (t.tt != DOLLAR) {
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
   AsgSid tmp;
   l += parse_sid(src + l, err, &tmp);
   if (err->tag != ERR_NONE) {
-    err->tag = ERR_MACRO_INV;
+    err->src = src + l;
     return l;
   }
   data->name.start = tmp.str.start;
@@ -112,6 +115,7 @@ size_t parse_macro_inv(const char *src, ParserError *err, AsgMacroInv *data) {
   l += t.len;
   if (t.tt != LPAREN) {
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
@@ -123,6 +127,7 @@ size_t parse_macro_inv(const char *src, ParserError *err, AsgMacroInv *data) {
 
     if (token_type_error(t.tt)) {
       err->tt = t.tt;
+      err->src = src + l;
       return l;
     } else if (t.tt == LPAREN) {
       nesting += 1;
@@ -161,6 +166,7 @@ size_t parse_literal(const char *src, ParserError *err, AsgLiteral *data) {
     data->tag = LITERAL_FALSE;
   } else {
     err->tag = ERR_LITERAL;
+    err->src = src;
   }
 
   return t.len;
@@ -247,6 +253,7 @@ size_t parse_bin_op(const char *src, ParserError *err, AsgBinOp *op) {
     default:
       err->tag = ERR_BIN_OP;
       err->tt = t.tt;
+      err->src = src;
       return t.len;
   }
 }
@@ -300,6 +307,7 @@ size_t parse_assign_op(const char *src, ParserError *err, AsgAssignOp *op) {
       if (t.tt != LANGLE) {
         err->tag = ERR_ASSIGN_OP;
         err->tt = t.tt;
+        err->src = src;
         return t.len;
       }
 
@@ -312,6 +320,7 @@ size_t parse_assign_op(const char *src, ParserError *err, AsgAssignOp *op) {
       } else {
         err->tag = ERR_ASSIGN_OP;
         err->tt = t.tt;
+        err->src = src;
         return t.len;
       }
     case RANGLE:
@@ -320,6 +329,7 @@ size_t parse_assign_op(const char *src, ParserError *err, AsgAssignOp *op) {
       if (t.tt != RANGLE) {
         err->tag = ERR_ASSIGN_OP;
         err->tt = t.tt;
+        err->src = src;
         return t.len;
       }
 
@@ -332,11 +342,13 @@ size_t parse_assign_op(const char *src, ParserError *err, AsgAssignOp *op) {
       } else {
         err->tag = ERR_ASSIGN_OP;
         err->tt = t.tt;
+        err->src = src;
         return t.len;
       }
     default:
       err->tag = ERR_ASSIGN_OP;
       err->tt = t.tt;
+      err->src = src;
       return t.len;
   }
 }
@@ -349,16 +361,18 @@ size_t parse_size_of(const char *src, ParserError *err, AsgType *data) {
   t = tokenize(src);
   l = t.len;
   if (t.tt != SIZEOF) {
-    err->tag = ERR_TYPE;
+    err->tag = ERR_SIZE_OF;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
   t = tokenize(src + l);
   l += t.len;
   if (t.tt != LPAREN) {
-    err->tag = ERR_TYPE;
+    err->tag = ERR_SIZE_OF;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
@@ -370,8 +384,9 @@ size_t parse_size_of(const char *src, ParserError *err, AsgType *data) {
   t = tokenize(src + l);
   l += t.len;
   if (t.tt != RPAREN) {
-    err->tag = ERR_TYPE;
+    err->tag = ERR_SIZE_OF;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
@@ -386,16 +401,18 @@ size_t parse_align_of(const char *src, ParserError *err, AsgType *data) {
   t = tokenize(src);
   l = t.len;
   if (t.tt != ALIGNOF) {
-    err->tag = ERR_TYPE;
+    err->tag = ERR_ALIGN_OF;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
   t = tokenize(src + l);
   l += t.len;
   if (t.tt != LPAREN) {
-    err->tag = ERR_TYPE;
+    err->tag = ERR_ALIGN_OF;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
@@ -407,8 +424,9 @@ size_t parse_align_of(const char *src, ParserError *err, AsgType *data) {
   t = tokenize(src + l);
   l += t.len;
   if (t.tt != RPAREN) {
-    err->tag = ERR_TYPE;
+    err->tag = ERR_ALIGN_OF;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
@@ -429,7 +447,6 @@ size_t parse_repeat(const char *src, ParserError *err, AsgRepeat *data) {
   } else if (t.tt == DOLLAR) {
     l += parse_macro_inv(src, err, &(data->macro));
     if (err->tag != ERR_NONE) {
-      err->tag = ERR_REPEAT;
       return l;
     }
     data->str.len = l - leading_ws;
@@ -437,7 +454,6 @@ size_t parse_repeat(const char *src, ParserError *err, AsgRepeat *data) {
   } else if (t.tt == SIZEOF) {
     l += parse_size_of(src, err, data->size_of);
     if (err->tag != ERR_NONE) {
-      err->tag = ERR_REPEAT;
       return l;
     }
     data->str.len = l - leading_ws;
@@ -445,7 +461,6 @@ size_t parse_repeat(const char *src, ParserError *err, AsgRepeat *data) {
   } else if (t.tt == ALIGNOF) {
     l += parse_align_of(src, err, data->align_of);
     if (err->tag != ERR_NONE) {
-      err->tag = ERR_REPEAT;
       return l;
     }
     data->str.len = l - leading_ws;
@@ -453,6 +468,7 @@ size_t parse_repeat(const char *src, ParserError *err, AsgRepeat *data) {
   } else {
     err->tag = ERR_REPEAT;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
@@ -538,7 +554,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
     case ID:
       l += parse_id(src, err, &id);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_TYPE;
+        return l;
       }
 
       t = tokenize(src + l);
@@ -575,7 +591,6 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
               if (err->tag != ERR_NONE) {
                 sb_free(sids);
                 free_sb_types(types);
-                err->tag = ERR_TYPE;
                 return l;
               }
 
@@ -586,6 +601,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
                 free_sb_types(types);
                 err->tag = ERR_TYPE;
                 err->tt = t.tt;
+                err->src = src + l;
                 return l;
               }
 
@@ -611,6 +627,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
             } else {
               err->tag = ERR_TYPE;
               err->tt = t.tt;
+              err->src = src + l;
               sb_free(sids);
               free_sb_types(types);
               return l;
@@ -622,7 +639,6 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
         AsgType *inner = sb_add(inners, 1);
         l += parse_type(src + l, err, inner);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_TYPE;
           free_sb_types(inners);
           return l;
         }
@@ -632,6 +648,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
         if (t.tt != COMMA && t.tt != RANGLE) {
           err->tag = ERR_TYPE;
           err->tt = t.tt;
+          err->src = src + l;
           free_sb_types(inners);
           return l;
         } else {
@@ -651,6 +668,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
             free_sb_types(inners);
             err->tag = ERR_TYPE;
             err->tt = t.tt;
+            err->src = src + l;
             return l;
           }
 
@@ -670,7 +688,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
     case DOLLAR:
       l += parse_macro_inv(src, err, &data->macro);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_TYPE;
+        return l;
       }
       data->tag = TYPE_MACRO;
       data->str.len = data->macro.str.len;
@@ -712,6 +730,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
       if (t.tt != RBRACKET) {
         err->tag = ERR_TYPE;
         err->tt = t.tt;
+        err->src = src + l;
         free(inner_array);
         return l;
       }
@@ -727,7 +746,6 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
       AsgSid *arg = sb_add(args, 1);
       l += parse_sid(src + l, err, arg);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_TYPE;
         sb_free(args);
         return l;
       }
@@ -737,6 +755,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
       if (t.tt != COMMA && t.tt != RANGLE) {
         err->tag = ERR_TYPE;
         err->tt = t.tt;
+        err->src = src + l;
         sb_free(args);
         return l;
       } else {
@@ -755,6 +774,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
           sb_free(args);
           err->tag = ERR_TYPE;
           err->tt = t.tt;
+          err->src = src + l;
           return l;
         }
 
@@ -763,6 +783,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
           sb_free(args);
           err->tag = ERR_TYPE;
           err->tt = t.tt;
+          err->src = src + l;
           return l;
         }
         l += t.len;
@@ -797,7 +818,6 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
 
           l += parse_type(src + l, err, ret);
           if (err->tag != ERR_NONE) {
-            err->tag = ERR_TYPE;
             return l;
           }
           data->tag = TYPE_FUN_ANON;
@@ -839,7 +859,6 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
             if (err->tag != ERR_NONE) {
               sb_free(sids);
               free_sb_types(types);
-              err->tag = ERR_TYPE;
               return l;
             }
 
@@ -850,6 +869,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
               free_sb_types(types);
               err->tag = ERR_TYPE;
               err->tt = t.tt;
+              err->src = src + l;
               return l;
             }
 
@@ -873,7 +893,6 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
 
             l += parse_type(src + l, err, ret);
             if (err->tag != ERR_NONE) {
-              err->tag = ERR_TYPE;
               sb_free(sids);
               free_sb_types(types);
               return l;
@@ -897,7 +916,6 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
       AsgType *inner = sb_add(inners, 1);
       l += parse_type(src + l, err, inner);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_TYPE;
         free_sb_types(inners);
         return l;
       }
@@ -908,7 +926,6 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
         l += parse_repeat(src + l, err, &data->product_repeated.repeat);
         if (err->tag != ERR_NONE) {
           free_sb_types(inners);
-          err->tag = ERR_TYPE;
           return l;
         }
 
@@ -918,6 +935,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
           free_sb_types(inners);
           err->tag = ERR_TYPE;
           err->tt = t.tt;
+          err->src = src + l;
           return l;
         }
 
@@ -931,6 +949,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
       } else if (t.tt != COMMA && t.tt != RPAREN) {
         err->tag = ERR_TYPE;
         err->tt = t.tt;
+        err->src = src + l;
         free_sb_types(inners);
         return l;
       } else {
@@ -950,6 +969,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
           free_sb_types(inners);
           err->tag = ERR_TYPE;
           err->tt = t.tt;
+          err->src = src + l;
           return l;
         }
 
@@ -961,7 +981,6 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
 
           l += parse_type(src + l, err, ret);
           if (err->tag != ERR_NONE) {
-            err->tag = ERR_TYPE;
             free_sb_types(inners);
             return l;
           }
@@ -984,6 +1003,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
       if (t.tt != PIPE) {
         err->tag = ERR_TYPE;
         err->tt = t.tt;
+        err->src = src + l;
         return l + t.len;
       }
       __attribute__((fallthrough));
@@ -992,7 +1012,6 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
         AsgSummand *summand = sb_add(summands, 1);
         l += parse_summand(src + l, err, summand);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_TYPE;
           free_sb_summands(summands);
           return l;
         }
@@ -1011,6 +1030,7 @@ size_t parse_type(const char *src, ParserError *err, AsgType *data) {
     default:
       err->tag = ERR_TYPE;
       err->tt = t.tt;
+      err->src = src + l;
       data->str.len = t.len;
       return t.len;
   }
@@ -1025,12 +1045,12 @@ size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
   if (t.tt != PIPE) {
     err->tag = ERR_SUMMAND;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
   l += parse_sid(src + l, err, &data->sid);
   if (err->tag != ERR_NONE) {
-    err->tag = ERR_SUMMAND;
     return l;
   }
 
@@ -1054,7 +1074,6 @@ size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
         type = sb_add(types, 1);
         l += parse_type(src + l, err, type);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_SUMMAND;
           sb_free(sids);
           free_sb_types(types);
           return l;
@@ -1068,7 +1087,6 @@ size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
           if (err->tag != ERR_NONE) {
             sb_free(sids);
             free_sb_types(types);
-            err->tag = ERR_SUMMAND;
             return l;
           }
 
@@ -1079,6 +1097,7 @@ size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
             free_sb_types(types);
             err->tag = ERR_SUMMAND;
             err->tt = t.tt;
+            err->src = src + l;
             return l;
           }
 
@@ -1087,7 +1106,6 @@ size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
           if (err->tag != ERR_NONE) {
             sb_free(sids);
             free_sb_types(types);
-            err->tag = ERR_SUMMAND;
             return l;
           }
 
@@ -1104,6 +1122,7 @@ size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
         } else {
           err->tag = ERR_SUMMAND;
           err->tt = t.tt;
+          err->src = src + l;
           sb_free(sids);
           free_sb_types(types);
           return l;
@@ -1115,7 +1134,6 @@ size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
     AsgType *inner = sb_add(inners, 1);
     l += parse_type(src + l, err, inner);
     if (err->tag != ERR_NONE) {
-      err->tag = ERR_SUMMAND;
       free_sb_types(inners);
       return l;
     }
@@ -1125,6 +1143,7 @@ size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
     if (t.tt != COMMA && t.tt != RPAREN) {
       err->tag = ERR_SUMMAND;
       err->tt = t.tt;
+      err->src = src + l;
       free_sb_types(inners);
       return l;
     } else {
@@ -1133,7 +1152,6 @@ size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
         inner = sb_add(inners, 1);
         l += parse_type(src + l, err, inner);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_SUMMAND;
           free_sb_types(inners);
           return l;
         }
@@ -1145,6 +1163,7 @@ size_t parse_summand(const char *src, ParserError *err, AsgSummand *data) {
         free_sb_types(inners);
         err->tag = ERR_SUMMAND;
         err->tt = t.tt;
+        err->src = src + l;
         return l;
       }
 
@@ -1257,6 +1276,7 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
       if (t.tt != ID) {
         err->tag = ERR_PATTERN;
         err->tt = t.tt;
+        err->src = src + l;
         return l + t.len;
       }
       __attribute__((fallthrough));
@@ -1269,7 +1289,6 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
         type = malloc(sizeof(AsgType));
         l += parse_type(src + l, err, type);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_PATTERN;
           free(type);
           return l;
         }
@@ -1341,7 +1360,6 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
             if (err->tag != ERR_NONE) {
               sb_free(sids);
               free_sb_patterns(inners);
-              err->tag = ERR_PATTERN;
               return l;
             }
 
@@ -1352,6 +1370,7 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
               free_sb_patterns(inners);
               err->tag = ERR_PATTERN;
               err->tt = t.tt;
+              err->src = src + l;
               return l;
             }
 
@@ -1376,6 +1395,7 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
           } else {
             err->tag = ERR_PATTERN;
             err->tt = t.tt;
+            err->src = src + l;
             sb_free(sids);
             free_sb_patterns(inners);
             return l;
@@ -1387,7 +1407,6 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
       AsgPattern *inner = sb_add(inners, 1);
       l += parse_pattern(src + l, err, inner);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_PATTERN;
         free_sb_patterns(inners);
         return l;
       }
@@ -1397,6 +1416,7 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
       if (t.tt != COMMA && t.tt != RPAREN) {
         err->tag = ERR_PATTERN;
         err->tt = t.tt;
+        err->src = src + l;
         free_sb_patterns(inners);
         return l;
       } else {
@@ -1416,6 +1436,7 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
           free_sb_patterns(inners);
           err->tag = ERR_PATTERN;
           err->tt = t.tt;
+          err->src = src + l;
           return l;
         }
 
@@ -1429,7 +1450,6 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
 
       l += parse_id(src + l, err, &id);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_PATTERN;
         return l;
       }
 
@@ -1453,7 +1473,6 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
             inner = sb_add(inners, 1);
             l += parse_pattern(src + l, err, inner);
             if (err->tag != ERR_NONE) {
-              err->tag = ERR_PATTERN;
               sb_free(sids);
               free_sb_patterns(inners);
               return l;
@@ -1465,7 +1484,6 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
               sid = sb_add(sids, 1);
               l += parse_sid(src + l, err, sid);
               if (err->tag != ERR_NONE) {
-                err->tag = ERR_PATTERN;
                 sb_free(sids);
                 free_sb_patterns(inners);
                 return l;
@@ -1475,16 +1493,16 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
               l += t.len;
               if (t.tt != EQ) {
                 err->tag = ERR_PATTERN;
+                err->tt = t.tt;
+                err->src = src + l;
                 sb_free(sids);
                 free_sb_patterns(inners);
-                err->tt = t.tt;
                 return l;
               }
 
               inner = sb_add(inners, 1);
               l += parse_pattern(src + l, err, inner);
               if (err->tag != ERR_NONE) {
-                err->tag = ERR_PATTERN;
                 sb_free(sids);
                 free_sb_patterns(inners);
                 return l;
@@ -1504,6 +1522,7 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
             } else {
               err->tt = t.tt;
               err->tag = ERR_PATTERN;
+              err->src = src + l;
               sb_free(sids);
               free_sb_patterns(inners);
               return l;
@@ -1515,7 +1534,6 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
         AsgPattern *inner = sb_add(inners, 1);
         l += parse_pattern(src + l, err, inner);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_PATTERN;
           free_sb_patterns(inners);
           return l;
         }
@@ -1523,8 +1541,9 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
         t = tokenize(src + l);
         l += t.len;
         if (t.tt != COMMA && t.tt != RPAREN) {
-          err->tt = t.tt;
           err->tag = ERR_PATTERN;
+          err->tt = t.tt;
+          err->src = src + l;
           free_sb_patterns(inners);
           return l;
         } else {
@@ -1533,7 +1552,6 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
             inner = sb_add(inners, 1);
             l += parse_pattern(src + l, err, inner);
             if (err->tag != ERR_NONE) {
-              err->tag = ERR_PATTERN;
               free_sb_patterns(inners);
               return l;
             }
@@ -1543,8 +1561,9 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
           }
           if (t.tt != RPAREN) {
             err->tag = ERR_PATTERN;
-            free_sb_patterns(inners);
             err->tt = t.tt;
+            err->src = src + l;
+            free_sb_patterns(inners);
             return l;
           }
 
@@ -1565,6 +1584,7 @@ size_t parse_pattern(const char *src, ParserError *err, AsgPattern *data) {
     default:
       err->tag = ERR_TYPE;
       err->tt = t.tt;
+      err->src = src + l;
       data->str.len = t.len;
       return t.len;
   }
@@ -1641,7 +1661,6 @@ size_t parse_meta(const char *src, ParserError *err, AsgMeta *data) {
       l += t.len;
       l += parse_literal(src + l, err, &data->unary);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_META;
         return l;
       }
 
@@ -1655,7 +1674,6 @@ size_t parse_meta(const char *src, ParserError *err, AsgMeta *data) {
       AsgMeta *inner = sb_add(data->nested, 1);
       l += parse_meta(src + l, err, inner);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_META;
         free_sb_meta(data->nested);
         return l;
       }
@@ -1664,8 +1682,9 @@ size_t parse_meta(const char *src, ParserError *err, AsgMeta *data) {
       l += t.len;
       if (t.tt != COMMA && t.tt != RPAREN) {
         err->tag = ERR_META;
-        free_sb_meta(data->nested);
         err->tt = t.tt;
+        err->src = src + l;
+        free_sb_meta(data->nested);
         return l;
       } else {
         while (t.tt == COMMA) {
@@ -1680,9 +1699,10 @@ size_t parse_meta(const char *src, ParserError *err, AsgMeta *data) {
           l += t.len;
         }
         if (t.tt != RPAREN) {
-          err->tag = ERR_EXP;
-          free_sb_meta(data->nested);
+          err->tag = ERR_META;
           err->tt = t.tt;
+          err->src = src + l;
+          free_sb_meta(data->nested);
           return l;
         }
 
@@ -1717,12 +1737,12 @@ size_t parse_attr(const char *src, ParserError *err, AsgMeta *data) {
   if (t.tt != BEGIN_ATTRIBUTE) {
     err->tag = ERR_ATTR;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
   l += parse_meta(src + l, err, data);
   if (err->tag != ERR_NONE) {
-    err->tag = ERR_ATTR;
     return l;
   }
 
@@ -1731,6 +1751,7 @@ size_t parse_attr(const char *src, ParserError *err, AsgMeta *data) {
   if (t.tt != RBRACKET) {
     err->tag = ERR_ATTR;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
@@ -1771,6 +1792,7 @@ size_t parse_block(const char *src, ParserError *err, AsgBlock *data) {
   if (t.tt != LBRACE) {
     err->tag = ERR_BLOCK;
     err->tt = t.tt;
+    err->src = src + l;
     return l;
   }
 
@@ -1792,7 +1814,6 @@ size_t parse_block(const char *src, ParserError *err, AsgBlock *data) {
 
   l += parse_attrs(src + l, err, attrs);
   if (err->tag != ERR_NONE) {
-    err->tag = ERR_BLOCK;
     free_sb_exps(exps);
     free_sb_sb_meta(all_attrs);
     return l;
@@ -1801,7 +1822,6 @@ size_t parse_block(const char *src, ParserError *err, AsgBlock *data) {
   AsgExp *exp = sb_add(exps, 1);
   l += parse_exp(src + l, err, exp);
   if (err->tag != ERR_NONE) {
-    err->tag = ERR_BLOCK;
     free_sb_exps(exps);
     free_sb_sb_meta(all_attrs);
     return l;
@@ -1815,7 +1835,6 @@ size_t parse_block(const char *src, ParserError *err, AsgBlock *data) {
     *attrs = NULL;
     l += parse_attrs(src + l, err, attrs);
     if (err->tag != ERR_NONE) {
-      err->tag = ERR_BLOCK;
       free_sb_exps(exps);
       free_sb_sb_meta(all_attrs);
       return l;
@@ -1824,7 +1843,6 @@ size_t parse_block(const char *src, ParserError *err, AsgBlock *data) {
     AsgExp *exp = sb_add(exps, 1);
     l += parse_exp(src + l, err, exp);
     if (err->tag != ERR_NONE) {
-      err->tag = ERR_BLOCK;
       free_sb_exps(exps);
       free_sb_sb_meta(all_attrs);
       return l;
@@ -1841,6 +1859,8 @@ size_t parse_block(const char *src, ParserError *err, AsgBlock *data) {
     return l;
   } else {
     err->tag = ERR_BLOCK;
+    err->tt = t.tt;
+    err->src = src + l;
     free_sb_exps(exps);
     free_sb_sb_meta(all_attrs);
     return l;
@@ -1872,7 +1892,7 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
     case ID:
       l += parse_id(src, err, &data->id);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_EXP;
+        return l;
       }
       data->str.len = l - leading_ws;
       data->tag = EXP_ID;
@@ -1880,7 +1900,7 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
     case DOLLAR:
       l += parse_macro_inv(src, err, &data->macro);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_EXP;
+        return l;
       }
       data->tag = EXP_MACRO;
       data->str.len = data->macro.str.len;
@@ -1920,7 +1940,7 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
     case LBRACE:
       l += parse_block(src + l, err, &data->block);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_EXP;
+        return l;
       }
       data->tag = EXP_BLOCK;
       data->str.len = l - leading_ws;
@@ -1940,6 +1960,7 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
       if (t.tt != RBRACKET) {
         err->tag = ERR_EXP;
         err->tt = t.tt;
+        err->src = src + l;
         free(inner_array);
         return l;
       }
@@ -1988,17 +2009,17 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
             if (err->tag != ERR_NONE) {
               sb_free(sids);
               free_sb_exps(inners);
-              err->tag = ERR_EXP;
               return l;
             }
 
             t = tokenize(src + l);
             l += t.len;
             if (t.tt != EQ) {
-              sb_free(sids);
-              free_sb_exps(inners);
               err->tag = ERR_EXP;
               err->tt = t.tt;
+              err->src = src + l;
+              sb_free(sids);
+              free_sb_exps(inners);
               return l;
             }
 
@@ -2026,7 +2047,6 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
       AsgExp *inner = sb_add(inners, 1);
       l += parse_exp(src + l, err, inner);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_EXP;
         free_sb_exps(inners);
         return l;
       }
@@ -2036,7 +2056,6 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
       if (t.tt == SEMI) {
         l += parse_repeat(src + l, err, &data->product_repeated.repeat);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_EXP;
           free_sb_exps(inners);
           return l;
         }
@@ -2045,8 +2064,9 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
         l += t.len;
         if (t.tt != RPAREN) {
           err->tag = ERR_EXP;
-          free_sb_exps(inners);
           err->tt = t.tt;
+          err->src = src + l;
+          free_sb_exps(inners);
           return l;
         }
 
@@ -2059,8 +2079,9 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
         return l;
       } else if (t.tt != COMMA && t.tt != RPAREN) {
         err->tag = ERR_EXP;
-        free_sb_exps(inners);
         err->tt = t.tt;
+        err->src = src + l;
+        free_sb_exps(inners);
         return l;
       } else {
         // anon product
@@ -2077,8 +2098,9 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
         }
         if (t.tt != RPAREN) {
           err->tag = ERR_EXP;
-          free_sb_exps(inners);
           err->tt = t.tt;
+          err->src = src + l;
+          free_sb_exps(inners);
           return l;
         }
 
@@ -2146,7 +2168,6 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
       l += t.len;
       l += parse_pattern(src + l, err, &data->val);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_EXP;
         return l;
       }
 
@@ -2265,6 +2286,7 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
       if (t.tt != LBRACE) {
         err->tag = ERR_EXP;
         err->tt = t.tt;
+        err->src = src + l;
         free(matcher_case);
         return l;
       }
@@ -2277,7 +2299,6 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
         AsgPattern *pattern = sb_add(patterns_case, 1);
         l += parse_pattern(src + l, err, pattern);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_EXP;
           free(matcher_case);
           free_sb_patterns(patterns_case);
           free_sb_blocks(blocks_case);
@@ -2287,7 +2308,6 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
         AsgBlock *block = sb_add(blocks_case, 1);
         l += parse_block(src + l, err, block);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_EXP;
           free(matcher_case);
           free_sb_patterns(patterns_case);
           free_sb_blocks(blocks_case);
@@ -2318,6 +2338,7 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
       if (t.tt != LBRACE) {
         err->tag = ERR_EXP;
         err->tt = t.tt;
+        err->src = src + l;
         free(matcher_loop);
         return l;
       }
@@ -2330,7 +2351,6 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
         AsgPattern *pattern = sb_add(patterns_loop, 1);
         l += parse_pattern(src + l, err, pattern);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_EXP;
           free(matcher_loop);
           free_sb_patterns(patterns_loop);
           free_sb_blocks(blocks_loop);
@@ -2340,7 +2360,6 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
         AsgBlock *block = sb_add(blocks_loop, 1);
         l += parse_block(src + l, err, block);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_EXP;
           free(matcher_loop);
           free_sb_patterns(patterns_loop);
           free_sb_blocks(blocks_loop);
@@ -2383,7 +2402,7 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
       l += t.len;
       l += parse_sid(src + l, err, &data->exp_goto);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_EXP;
+        return l;
       }
       data->tag = EXP_GOTO;
       data->str.len = l - leading_ws;
@@ -2392,7 +2411,7 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
       l += t.len;
       l += parse_sid(src + l, err, &data->exp_label);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_EXP;
+        return l;
       }
       data->tag = EXP_LABEL;
       data->str.len = l - leading_ws;
@@ -2400,6 +2419,7 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
     default:
     err->tag = ERR_EXP;
     err->tt = t.tt;
+    err->src = src;
     data->str.len = t.len;
     return t.len;
   }
@@ -2446,6 +2466,7 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
         if (t.tt != RBRACKET) {
           err->tag = ERR_EXP;
           err->tt = t.tt;
+          err->src = src + l;
           free(array_index);
           free_inner_exp(*data);
           return l;
@@ -2495,6 +2516,7 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
             free_inner_exp(*data);
             err->tag = ERR_EXP;
             err->tt = t.tt;
+            err->src = src + l;
             return l;
         }
         break;
@@ -2547,7 +2569,6 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
                 sb_free(sids);
                 free_sb_exps(inners);
                 free(l_fun_app);
-                err->tag = ERR_EXP;
                 return l;
               }
 
@@ -2559,6 +2580,7 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
                 free(l_fun_app);
                 err->tag = ERR_EXP;
                 err->tt = t.tt;
+                err->src = src + l;
                 return l;
               }
 
@@ -2590,7 +2612,6 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
         AsgExp *inner = sb_add(inners, 1);
         l += parse_exp(src + l, err, inner);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_EXP;
           free_sb_exps(inners);
           free(l_fun_app);
           return l;
@@ -2600,9 +2621,10 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
         l += t.len;
         if (t.tt != COMMA && t.tt != RPAREN) {
           err->tag = ERR_EXP;
+          err->tt = t.tt;
+          err->src = src + l;
           free_sb_exps(inners);
           free(l_fun_app);
-          err->tt = t.tt;
           return l;
         } else {
           while (t.tt == COMMA) {
@@ -2619,9 +2641,10 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
           }
           if (t.tt != RPAREN) {
             err->tag = ERR_EXP;
+            err->tt = t.tt;
+            err->src = src + l;
             free_sb_exps(inners);
             free(l_fun_app);
-            err->tt = t.tt;
             return l;
           }
 
@@ -2640,7 +2663,6 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
         l += parse_type(src + l, err, cast_type);
         if (err->tag != ERR_NONE) {
           free(cast_type);
-          err->tag = ERR_EXP;
           return l;
         }
 
@@ -2673,7 +2695,6 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
         l += parse_bin_op(src + l, err, &bin_op);
         if (err->tag != ERR_NONE) {
           if (err->tag != ERR_NONE) {
-            err->tag = ERR_EXP;
             return l;
           }
         }
@@ -2711,7 +2732,6 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
         AsgAssignOp op;
         l += parse_assign_op(src + l, err, &op);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_EXP;
           return l;
         }
 
@@ -2741,10 +2761,7 @@ size_t parse_exp(const char *src, ParserError *err, AsgExp *data) {
           AsgBinOp bin_op;
           l += parse_bin_op(src + l, err, &bin_op);
           if (err->tag != ERR_NONE) {
-            if (err->tag != ERR_NONE) {
-              err->tag = ERR_EXP;
-              return l;
-            }
+            return l;
           }
 
           AsgExp *bin_op_rhs = malloc(sizeof(AsgExp));
@@ -2952,6 +2969,7 @@ size_t parse_sid_or_use_kw(const char *src, ParserError *err, AsgSid *data) {
   if (t.tt != ID && t.tt != DEP && t.tt != MAGIC && t.tt != KW_MOD) {
     err->tag = ERR_SID;
     err->tt = t.tt;
+    err->src = src;
     return t.len;
   } else {
     err->tag = ERR_NONE;
@@ -2972,7 +2990,6 @@ size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data, AsgFi
 
   l += parse_sid_or_use_kw(src, err, &data->sid);
   if (err->tag != ERR_NONE) {
-    err->tag = ERR_USE_TREE;
     return l;
   }
 
@@ -2981,7 +2998,6 @@ size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data, AsgFi
     l += t.len;
     l += parse_sid(src + l, err, &data->rename);
     if (err->tag != ERR_NONE) {
-      err->tag = ERR_USE_TREE;
       return l;
     }
 
@@ -3018,8 +3034,9 @@ size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data, AsgFi
       l += t.len;
       if (t.tt != COMMA && t.tt != RBRACE) {
         err->tag = ERR_USE_TREE;
-        free_sb_use_tree(inners);
         err->tt = t.tt;
+        err->src = src + l;
+        free_sb_use_tree(inners);
         return l;
       } else {
         while (t.tt == COMMA) {
@@ -3035,8 +3052,9 @@ size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data, AsgFi
         }
         if (t.tt != RBRACE) {
           err->tag = ERR_EXP;
-          free_sb_use_tree(inners);
           err->tt = t.tt;
+          err->src = src + l;
+          free_sb_use_tree(inners);
           return l;
         }
 
@@ -3048,6 +3066,7 @@ size_t parse_use_tree(const char *src, ParserError *err, AsgUseTree *data, AsgFi
     } else {
       err->tag = ERR_USE_TREE;
       err->tt = t.tt;
+      err->src = src + l;
       return l;
     }
   } else {
@@ -3097,7 +3116,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
     case USE:
       l += parse_use_tree(src + l, err, &data->use, asg);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_ITEM;
         return l;
       }
 
@@ -3107,7 +3125,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
     case TYPE:
       l += parse_sid(src + l, err, &data->type.sid);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_ITEM;
         return l;
       }
 
@@ -3115,13 +3132,13 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       if (t.tt != EQ) {
         err->tag = ERR_ITEM;
         err->tt = t.tt;
+        err->src = src + l;
         return l;
       }
       l += t.len;
 
       l += parse_type(src + l, err, &data->type.type);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_ITEM;
         return l;
       }
 
@@ -3140,7 +3157,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
 
       l += parse_sid(src + l, err, &data->val.sid);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_ITEM;
         return l;
       }
 
@@ -3148,13 +3164,13 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       if (t.tt != EQ) {
         err->tag = ERR_ITEM;
         err->tt = t.tt;
+        err->src = src + l;
         return l;
       }
       l += t.len;
 
       l += parse_exp(src + l, err, &data->val.exp);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_ITEM;
         return l;
       }
 
@@ -3164,7 +3180,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
     case FN:
       l += parse_sid(src + l, err, &data->type.sid);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_ITEM;
         return l;
       }
 
@@ -3172,6 +3187,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       if (t.tt != EQ) {
         err->tag = ERR_ITEM;
         err->tt = t.tt;
+        err->src = src + l;
         return l;
       }
       l += t.len;
@@ -3184,7 +3200,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         AsgSid *type_arg = sb_add(type_args, 1);
         l += parse_sid(src + l, err, type_arg);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_ITEM;
           sb_free(type_args);
           return l;
         }
@@ -3194,6 +3209,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         if (t.tt != COMMA && t.tt != RANGLE) {
           err->tag = ERR_ITEM;
           err->tt = t.tt;
+          err->src = src + l;
           sb_free(type_args);
           return l;
         } else {
@@ -3201,7 +3217,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
             type_arg = sb_add(type_args, 1);
             l += parse_sid(src + l, err, type_arg);
             if (err->tag != ERR_NONE) {
-              err->tag = ERR_ITEM;
               sb_free(type_args);
               return l;
             }
@@ -3212,6 +3227,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
           if (t.tt != RANGLE) {
             err->tag = ERR_ITEM;
             err->tt = t.tt;
+            err->src = src + l;
             sb_free(type_args);
             return l;
           }
@@ -3223,6 +3239,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
           if (t.tt != FAT_ARROW) {
             err->tag = ERR_ITEM;
             err->tt = t.tt;
+            err->src = src + l;
             sb_free(type_args);
             return l;
           }
@@ -3236,6 +3253,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       if (t.tt != LPAREN) {
         err->tag = ERR_ITEM;
         err->tt = t.tt;
+        err->src = src + l;
         sb_free(data->fun.type_args);
         return l;
       }
@@ -3258,6 +3276,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         if (t.tt != COLON) {
           err->tag = ERR_ITEM;
           err->tt = t.tt;
+          err->src = src + l;
           sb_free(data->fun.type_args);
           sb_free(sids);
           free_sb_types(types);
@@ -3268,7 +3287,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         type = sb_add(types, 1);
         l += parse_type(src + l, err, type);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_ITEM;
           sb_free(data->fun.type_args);
           sb_free(sids);
           free_sb_types(types);
@@ -3281,7 +3299,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
           sid = sb_add(sids, 1);
           l += parse_sid(src + l, err, sid);
           if (err->tag != ERR_NONE) {
-            err->tag = ERR_ITEM;
             sb_free(data->fun.type_args);
             sb_free(sids);
             free_sb_types(types);
@@ -3293,6 +3310,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
           if (t.tt != COLON) {
             err->tag = ERR_ITEM;
             err->tt = t.tt;
+            err->src = src + l;
             sb_free(data->fun.type_args);
             sb_free(sids);
             free_sb_types(types);
@@ -3302,7 +3320,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
           type = sb_add(types, 1);
           l += parse_type(src + l, err, type);
           if (err->tag != ERR_NONE) {
-            err->tag = ERR_ITEM;
             sb_free(data->fun.type_args);
             sb_free(sids);
             free_sb_types(types);
@@ -3316,6 +3333,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         if (t.tt != RPAREN) {
           err->tag = ERR_ITEM;
           err->tt = t.tt;
+          err->src = src + l;
           sb_free(data->fun.type_args);
           sb_free(sids);
           free_sb_types(types);
@@ -3331,7 +3349,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         l += t.len;
         l += parse_type(src + l, err, &data->fun.ret);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_ITEM;
           sb_free(data->fun.type_args);
           sb_free(data->fun.arg_sids);
           free_sb_types(data->fun.arg_types);
@@ -3346,7 +3363,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
 
       l += parse_block(src + l, err, &data->fun.body);
       if (err->tag != ERR_NONE) {
-        err->tag = ERR_ITEM;
         sb_free(data->fun.type_args);
         sb_free(data->fun.arg_sids);
         free_sb_types(data->fun.arg_types);
@@ -3366,6 +3382,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         if (t.tt != LPAREN) {
           err->tag = ERR_ITEM;
           err->tt = t.tt;
+          err->src = src + l;
           return l;
         }
         l += t.len;
@@ -3381,6 +3398,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
           if (t.tt == END || token_type_error(t.tt)) {
             err->tag = ERR_ITEM;
             err->tt = t.tt;
+            err->src = src + l;
             return l;
           }
         }
@@ -3400,7 +3418,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
 
         l += parse_sid(src + l, err, &data->ffi_val.sid);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_ITEM;
           return l;
         }
 
@@ -3408,6 +3425,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         if (t.tt != COLON) {
           err->tag = ERR_ITEM;
           err->tt = t.tt;
+          err->src = src + l;
           return l;
         }
         l += t.len;
@@ -3415,7 +3433,6 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
 
         l += parse_type(src + l, err, &data->ffi_val.type);
         if (err->tag != ERR_NONE) {
-          err->tag = ERR_ITEM;
           return l;
         }
 
@@ -3426,6 +3443,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
     default:
       err->tag = ERR_ITEM;
       err->tt = t.tt;
+      err->src = src + l;
       data->str.len = l;
       return l;
   }
@@ -3460,6 +3478,7 @@ void free_inner_item(AsgItem data) {
 size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
   Token t;
   err->tag = ERR_NONE;
+  err->full_src = src;
   data->str.start = src;
   size_t l = 0;
 
@@ -3473,7 +3492,6 @@ size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
 
   l += parse_attrs(src + l, err, attrs);
   if (err->tag != ERR_NONE) {
-    err->tag = ERR_FILE;
     free_sb_items(items);
     free_sb_sb_meta(all_attrs);
     return l;
@@ -3482,7 +3500,6 @@ size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
   AsgItem *item = sb_add(items, 1);
   l += parse_item(src + l, err, item, data);
   if (err->tag != ERR_NONE) {
-    err->tag = ERR_FILE;
     free_sb_items(items);
     free_sb_sb_meta(all_attrs);
     return l;
@@ -3495,7 +3512,6 @@ size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
     *attrs = NULL;
     l += parse_attrs(src + l, err, attrs);
     if (err->tag != ERR_NONE) {
-      err->tag = ERR_FILE;
       free_sb_items(items);
       free_sb_sb_meta(all_attrs);
       return l;
@@ -3504,7 +3520,6 @@ size_t parse_file(const char *src, ParserError *err, AsgFile *data) {
     AsgItem *item = sb_add(items, 1);
     l += parse_item(src + l, err, item, data);
     if (err->tag != ERR_NONE) {
-      err->tag = ERR_FILE;
       free_sb_items(items);
       free_sb_sb_meta(all_attrs);
       return l;

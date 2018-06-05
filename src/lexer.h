@@ -22,7 +22,10 @@ typedef enum {
 
 // Returns a string with a a human-readable error message for the TokenType
 // if it is an error type, or NULL otherwise.
-const char * token_type_error(TokenType tt);
+const char *token_type_error(TokenType tt);
+
+// Returns a string with a human-readable name of the TokenType.
+const char *token_type_name(TokenType tt);
 
 // A TokenType, together with the lenght of the token.
 typedef struct Token {

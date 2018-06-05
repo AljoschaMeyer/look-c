@@ -6,7 +6,7 @@
 #include "lexer.h"
 #include "util.h"
 
-const char * token_type_error(TokenType tt) {
+const char *token_type_error(TokenType tt) {
   if (tt == ERR_BEGIN_ATTRIBUTE) {
     return "# must be followed by [, to begin an attribute";
   } else if (tt == ERR_EOF) {
@@ -27,6 +27,95 @@ const char * token_type_error(TokenType tt) {
     return "Expected an exponent for the floating point literal";
   } else {
     return NULL;
+  }
+}
+
+const char *token_type_name(TokenType tt) {
+  switch (tt) {
+    case AT: return "@";
+    case TILDE: return "~";
+    case EQ: return "=";
+    case LPAREN: return "(";
+    case RPAREN: return ")";
+    case LBRACKET: return "[";
+    case RBRACKET: return "]";
+    case LBRACE: return "{";
+    case RBRACE: return "}";
+    case DOT: return ".";
+    case LANGLE: return "<";
+    case RANGLE: return ">";
+    case COMMA: return ",";
+    case DOLLAR: return "$";
+    case PLUS: return "+";
+    case PLUS_WRAPPING: return "+%";
+    case MINUS: return "-";
+    case MINUS_WRAPPING: return "-%";
+    case TIMES: return "*";
+    case TIMES_WRAPPING: return "*%";
+    case DIV: return "/";
+    case MOD: return "%";
+    case COLON: return ":";
+    case SEMI: return ";";
+    case PIPE: return "|";
+    case SCOPE: return "::";
+    case ARROW: return "->";
+    case FAT_ARROW: return "=>";
+    case BEGIN_ATTRIBUTE: return "#[";
+    case UNDERSCORE: return "_";
+    case ID: return "simple identifier";
+    case INT: return "integer literal";
+    case FLOAT: return "floating point literal";
+    case STRING: return "string literal";
+    case USE: return "use keyword";
+    case KW_MOD: return "mod keyword";
+    case DEP: return "dep keyword";
+    case MAGIC: return "magic keyword";
+    case GOTO: return "goto keyword";
+    case LABEL: return "label keyword";
+    case BREAK: return "break keyword";
+    case RETURN: return "return keyword";
+    case IF: return "if keyword";
+    case ELSE: return "else keyword";
+    case WHILE: return "while keyword";
+    case CASE: return "case keyword";
+    case LOOP: return "loop keyword";
+    case AS: return "as keyword";
+    case VAL: return "val keyword";
+    case FN: return "fn keyword";
+    case TYPE: return "type keyword";
+    case MACRO: return "macro keyword";
+    case MUT: return "mut keyword";
+    case PUB: return "pub keyword";
+    case FFI: return "ffi keyword";
+    case SIZEOF: return "sizeof keyword";
+    case ALIGNOF: return "alignof keyword";
+    case HALT: return "halt keyword";
+    case KW_TRUE: return "true keyword";
+    case KW_FALSE: return "false keyword";
+    case PLUS_ASSIGN: return "+=";
+    case PLUS_WRAPPING_ASSIGN: return "+%=";
+    case MINUS_ASSIGN: return "-=";
+    case MINUS_WRAPPING_ASSIGN: return "-%=";
+    case TIMES_ASSIGN: return "*=";
+    case TIMES_WRAPPING_ASSIGN: return "*%=";
+    case DIV_ASSIGN: return "/=";
+    case MOD_ASSIGN: return "%=";
+    case XOR_ASSIGN: return "^=";
+    case AND_ASSIGN: return "&=";
+    case OR_ASSIGN: return "|=";
+    case XOR: return "^";
+    case AMPERSAND: return "&";
+    case LOR: return "||";
+    case LAND: return "&&";
+    case NOT: return "!";
+    case EQUALS: return "==";
+    case NOTEQUALS: return "!=";
+    case GREATER: return ">";
+    case GREATER_EQ: return ">=";
+    case SMALLER: return "<";
+    case SMALLER_EQ: return "<=";
+    case END: return "end of input";
+    default: return "error token";
   }
 }
 

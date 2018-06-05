@@ -41,7 +41,6 @@ void err_print(OoError *err) {
       printf("%s\n", "no error");
       break;
     case OO_ERR_SYNTAX:
-      printf("%s\n", "syntax error");
       break;
     case OO_ERR_FILE:
       printf("%s\n", "file error");
@@ -93,8 +92,78 @@ void err_print(OoError *err) {
 
   switch (err->tag) {
     case OO_ERR_NONE:
-    case OO_ERR_SYNTAX:
     case OO_ERR_FILE:
+      break;
+    case OO_ERR_SYNTAX:
+      printf("In file %s\n", err->parser.path);
+      switch (err->parser.tag) {
+        case ERR_NONE:
+          abort();
+          break;
+        case ERR_SID:
+          printf("syntax error parsing a simple identifier\n");
+          break;
+        case ERR_ID:
+          printf("syntax error parsing an identifier\n");
+          break;
+        case ERR_MACRO_INV:
+          printf("syntax error parsing a macro invocation\n");
+          break;
+        case ERR_LITERAL:
+          printf("syntax error parsing a literal\n");
+          break;
+        case ERR_SIZE_OF:
+          printf("syntax error parsing a sizeof\n");
+          break;
+        case ERR_ALIGN_OF:
+          printf("syntax error parsing an alignof\n");
+          break;
+        case ERR_REPEAT:
+          printf("syntax error parsing a repeat\n");
+          break;
+        case ERR_BIN_OP:
+          printf("syntax error parsing a binary operator\n");
+          break;
+        case ERR_ASSIGN_OP:
+          printf("syntax error parsing an assingment operator\n");
+          break;
+        case ERR_TYPE:
+          printf("syntax error parsing a type\n");
+          break;
+        case ERR_SUMMAND:
+          printf("syntax error parsing a summand\n");
+          break;
+        case ERR_PATTERN:
+          printf("syntax error parsing a pattern\n");
+          break;
+        case ERR_EXP:
+          printf("syntax error parsing an expression\n");
+          break;
+        case ERR_BLOCK:
+          printf("syntax error parsing a block\n");
+          break;
+        case ERR_ATTR:
+          printf("syntax error parsing an attribute\n");
+          break;
+        case ERR_META:
+          printf("syntax error parsing a meta item\n");
+          break;
+        case ERR_USE_TREE:
+          printf("syntax error parsing a use tree\n");
+          break;
+        case ERR_ITEM:
+          printf("syntax error parsing an item\n");
+          break;
+        case ERR_FILE:
+          printf("syntax error parsing a file\n");
+          break;
+      }
+      if (token_type_error(err->parser.tt) != NULL) {
+        printf("%s\n", token_type_error(err->parser.tt));
+      } else {
+        printf("Unexpected token: %s\n", token_type_name(err->parser.tt));
+      }
+      print_location(str_new(err->parser.src, 0), str_new(err->parser.full_src, strlen(err->parser.full_src)));
       break;
     case OO_ERR_CYCLIC_IMPORTS:
       print_location(err->cyclic_import->str, err->asg->str);
@@ -296,6 +365,7 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
         parse_file(*src, &err->parser, asg);
         if (err->parser.tag != ERR_NONE) {
           err->tag = OO_ERR_SYNTAX;
+          err->parser.path = inner_path;
           goto done;
         }
         asg->path = inner_path;
