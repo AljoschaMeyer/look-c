@@ -82,6 +82,9 @@ void err_print(OoError *err) {
     case OO_ERR_BINDING_NOT_SUMMAND:
       printf("%s\n", "binding is not a summand error");
       break;
+    case OO_ERR_NOT_CONST_EXP:
+      printf("%s\n", "invlid top level val error");
+      break;
   }
 
   if (err->tag != OO_ERR_NONE && err->tag != OO_ERR_SYNTAX && err->tag != OO_ERR_FILE) {
@@ -140,6 +143,10 @@ void err_print(OoError *err) {
     case OO_ERR_BINDING_NOT_SUMMAND:
       print_location(err->binding_not_summand->str, err->asg->str);
       str_print(err->binding_not_summand->str);
+      break;
+    case OO_ERR_NOT_CONST_EXP:
+      print_location(err->not_const_exp->str, err->asg->str);
+      str_print(err->not_const_exp->str);
       break;
   }
 }
@@ -895,6 +902,61 @@ void oo_cx_fine_bindings(OoContext *cx, OoError *err) {
   }
 }
 
+// Return whether the expression can be assigned to a top level val item.
+static bool is_item_val(AsgExp *exp) {
+  switch (exp->tag) {
+    case EXP_ID:
+    case EXP_LITERAL:
+    case EXP_SIZE_OF:
+    case EXP_ALIGN_OF:
+      return true;
+    case EXP_REF:
+      return is_item_val(exp->ref);
+    case EXP_REF_MUT:
+      return is_item_val(exp->ref_mut);
+    case EXP_DEREF:
+      return is_item_val(exp->deref);
+    case EXP_DEREF_MUT:
+      return is_item_val(exp->deref_mut);
+    case EXP_ARRAY:
+      return is_item_val(exp->array);
+    case EXP_ARRAY_INDEX:
+      return is_item_val(exp->array_index.arr) && is_item_val(exp->array_index.index);
+    case EXP_PRODUCT_REPEATED:
+      return is_item_val(exp->product_repeated.inner);
+    case EXP_PRODUCT_ANON:
+      for (size_t i = 0; i < (size_t) sb_count(exp->product_anon); i++) {
+        if (!is_item_val(&exp->product_anon[i])) {
+          return false;
+        }
+      }
+      return true;
+    case EXP_PRODUCT_NAMED:
+      for (size_t i = 0; i < (size_t) sb_count(exp->product_named.inners); i++) {
+        if (!is_item_val(&exp->product_named.inners[i])) {
+          return false;
+        }
+      }
+      return true;
+    case EXP_PRODUCT_ACCESS_ANON:
+      return is_item_val(exp->product_access_anon.inner);
+    case EXP_PRODUCT_ACCESS_NAMED:
+      return is_item_val(exp->product_access_named.inner);
+    case EXP_CAST:
+      return is_item_val(exp->cast.inner);
+    case EXP_NOT:
+      return is_item_val(exp->exp_not);
+    case EXP_NEGATE:
+      return is_item_val(exp->exp_negate);
+    case EXP_WRAPPING_NEGATE:
+      return is_item_val(exp->exp_wrapping_negate);
+    case EXP_BIN_OP:
+      return is_item_val(exp->bin_op.lhs) && is_item_val(exp->bin_op.rhs);
+    default:
+      return false;
+  }
+}
+
 static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
   ScopeStack ss;
   ss_init(&ss);
@@ -907,7 +969,13 @@ static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
         type_fine_bindings(cx, err, &ss, &asg->items[i].type.type, asg);
         break;
       case ITEM_VAL:
-        exp_fine_bindings(cx, err, &ss, &asg->items[i].val.exp, asg);
+        if (is_item_val(&asg->items[i].val.exp)) {
+          exp_fine_bindings(cx, err, &ss, &asg->items[i].val.exp, asg);
+        } else {
+          err->tag = OO_ERR_NOT_CONST_EXP;
+          err->not_const_exp = &asg->items[i].val.exp;
+          return;
+        }
         break;
       case ITEM_FUN:
         if (sb_count(asg->items[i].fun.type_args) > 0) {

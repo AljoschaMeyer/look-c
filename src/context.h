@@ -12,7 +12,7 @@ typedef enum {
   OO_ERR_DUP_ID_ITEM, OO_ERR_DUP_ID_ITEM_USE, OO_ERR_INVALID_BRANCH,
   OO_ERR_NONEXISTING_SID_USE, OO_ERR_NONEXISTING_SID, OO_ERR_ID_NOT_A_NS,
   OO_ERR_ID_NOT_IN_NS, OO_ERR_BINDING_NOT_TYPE, OO_ERR_BINDING_NOT_EXP,
-  OO_ERR_DUP_ID_SCOPE, OO_ERR_BINDING_NOT_SUMMAND
+  OO_ERR_DUP_ID_SCOPE, OO_ERR_BINDING_NOT_SUMMAND, OO_ERR_NOT_CONST_EXP
 } OoErrorTag;
 
 typedef struct OoError {
@@ -33,6 +33,7 @@ typedef struct OoError {
     AsgId *binding_not_exp;
     Str dup_id_scope;
     AsgId *binding_not_summand;
+    AsgExp *not_const_exp;
   };
 } OoError;
 
