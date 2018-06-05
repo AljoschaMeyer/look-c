@@ -152,10 +152,14 @@ static void filter_exp(AsgExp *exp, rax *features) {
       filter_block_sb(exp->exp_loop.blocks, features);
       break;
     case EXP_RETURN:
-      filter_exp(exp->exp_return, features);
+      if (exp->exp_return != NULL) {
+        filter_exp(exp->exp_return, features);
+      }
       break;
     case EXP_BREAK:
-      filter_exp(exp->exp_break, features);
+      if (exp->exp_break != NULL) {
+        filter_exp(exp->exp_break, features);
+      }
       break;
     default:
       break;

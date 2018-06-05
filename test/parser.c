@@ -1079,6 +1079,15 @@ void test_exp(void) {
   assert(sb_count(data.exp_loop.blocks) == 2);
   free_inner_exp(data);
 
+  src = " return";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_RETURN);
+  assert(data.str.len == strlen(src) - 1);
+  assert(data.str.start == src + 1);
+  assert(data.exp_return == NULL);
+  free_inner_exp(data);
+
   src = " return @a";
   assert(parse_exp(src, &err, &data) == strlen(src));
   assert(err.tag == ERR_NONE);
@@ -1088,6 +1097,15 @@ void test_exp(void) {
   assert(data.exp_return->str.start == src + 8);
   assert(data.exp_return->str.len == 2);
   assert(data.exp_return->tag == EXP_REF);
+  free_inner_exp(data);
+
+  src = " break";
+  assert(parse_exp(src, &err, &data) == strlen(src));
+  assert(err.tag == ERR_NONE);
+  assert(data.tag == EXP_BREAK);
+  assert(data.str.len == strlen(src) - 1);
+  assert(data.str.start == src + 1);
+  assert(data.exp_break == NULL);
   free_inner_exp(data);
 
   src = " break @a";

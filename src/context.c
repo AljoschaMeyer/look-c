@@ -370,7 +370,7 @@ static void parse_handle_dir(const char *path, AsgNS *ns, OoContext *cx, OoError
         }
         asg->path = inner_path;
 
-        oo_filter_cc(asg, features);
+        // oo_filter_cc(asg, features); FIXME filtering changes the addresses of asg nodes, breaking bindings, frees and everything... Solution: Add asg nodes that represent filtered nodes
 
         inner_binding->tag = BINDING_NS;
         inner_binding->private = false;
@@ -1544,10 +1544,14 @@ static void exp_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgEx
       }
       break;
     case EXP_RETURN:
-      exp_fine_bindings(cx, err, ss, exp->exp_return, asg);
+      if (exp->exp_return != NULL) {
+        exp_fine_bindings(cx, err, ss, exp->exp_return, asg);
+      }
       break;
     case EXP_BREAK:
-      exp_fine_bindings(cx, err, ss, exp->exp_break, asg);
+      if (exp->exp_break != NULL) {
+        exp_fine_bindings(cx, err, ss, exp->exp_break, asg);
+      }
       break;
     case EXP_GOTO:
     case EXP_LABEL:

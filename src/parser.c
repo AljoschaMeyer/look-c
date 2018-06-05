@@ -2208,7 +2208,6 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
       }
 
       t = tokenize(src + l);
-      l += t.len;
       if (t.tt != ELSE) {
         data->tag = EXP_IF;
         data->str.len = l - leading_ws;
@@ -2219,6 +2218,7 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
         data->exp_if.else_block.attrs = NULL;
         return l;
       } else {
+        l += t.len;
         t = tokenize(src + l);
         if (t.tt == IF) {
           // treat this as a block containing a single expression
@@ -2379,9 +2379,13 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
     case RETURN:
       l += t.len;
       AsgExp *inner_return = malloc(sizeof(AsgExp));
-      l += parse_exp(src + l, err, inner_return);
+      size_t tmp0 = parse_exp(src + l, err, inner_return);
       if (err->tag != ERR_NONE) {
         free(inner_return);
+        inner_return = NULL;
+        err->tag = ERR_NONE;
+      } else {
+        l += tmp0;
       }
       data->tag = EXP_RETURN;
       data->str.len = l - leading_ws;
@@ -2390,9 +2394,13 @@ size_t parse_exp_non_left_recursive(const char *src, ParserError *err, AsgExp *d
     case BREAK:
       l += t.len;
       AsgExp *inner_break = malloc(sizeof(AsgExp));
-      l += parse_exp(src + l, err, inner_break);
+      size_t tmp1 = parse_exp(src + l, err, inner_break);
       if (err->tag != ERR_NONE) {
         free(inner_break);
+        inner_break = NULL;
+        err->tag = ERR_NONE;
+      } else {
+        l += tmp1;
       }
       data->tag = EXP_BREAK;
       data->str.len = l - leading_ws;
@@ -2891,12 +2899,16 @@ void free_inner_exp(AsgExp data) {
       free_sb_blocks(data.exp_loop.blocks);
       break;
     case EXP_RETURN:
-      free_inner_exp(*data.exp_return);
-      free(data.exp_return);
+      if (data.exp_return != NULL) {
+        free_inner_exp(*data.exp_return);
+        free(data.exp_return);
+      }
       break;
     case EXP_BREAK:
-      free_inner_exp(*data.exp_break);
-      free(data.exp_break);
+      if (data.exp_break != NULL) {
+        free_inner_exp(*data.exp_break);
+        free(data.exp_break);
+      }
       break;
     case EXP_DEREF:
       free_inner_exp(*data.deref);

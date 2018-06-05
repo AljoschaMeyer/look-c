@@ -579,8 +579,8 @@ typedef struct AsgExp {
     AsgExpCase exp_case;
     AsgExpWhile exp_while;
     AsgExpLoop exp_loop;
-    AsgExp *exp_return;
-    AsgExp *exp_break;
+    AsgExp *exp_return; // NULL if no explicit expression is returned
+    AsgExp *exp_break; // NULL if no explicit expression is broken
     AsgSid exp_goto;
     AsgSid exp_label;
   };

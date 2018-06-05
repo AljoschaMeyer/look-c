@@ -1,5 +1,8 @@
 #include <linux/limits.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "context.h"
 #include "stretchy_buffer.h"
@@ -65,8 +68,7 @@ bool look_to_html(OoContext *cx, const char *out_dir) {
 
 void render_file(OoContext *cx, AsgFile *asg, FILE *f) {
   fprintf(f, "%s\n", "hi!"); // TODO
-  cx->mods = NULL;
-  asg->path = NULL;
+  printf("%s, %s\n", cx->mods, asg->path);
 }
 
 int main(int argc, char *argv[]) {
@@ -76,17 +78,17 @@ int main(int argc, char *argv[]) {
   }
   size_t dir_len = strlen(argv[1]);
 
-  char *out_dir = malloc(dir_len + 5);
+  char *out_dir = malloc(dir_len + 6);
   memcpy(out_dir, argv[1], dir_len);
-  memcpy(out_dir + dir_len, "/html", 5);
+  memcpy(out_dir + dir_len, "/html", 6);
 
-  char *deps_dir = malloc(dir_len + 8);
+  char *deps_dir = malloc(dir_len + 9);
   memcpy(deps_dir, argv[1], dir_len);
-  memcpy(deps_dir + dir_len, "/devdeps", 8);
+  memcpy(deps_dir + dir_len, "/devdeps", 9);
 
-  char *mod_dir = malloc(dir_len + 4);
+  char *mod_dir = malloc(dir_len + 5);
   memcpy(mod_dir, argv[1], dir_len);
-  memcpy(mod_dir + dir_len, "/src", 4);
+  memcpy(mod_dir + dir_len, "/src", 5);
 
   OoContext cx;
   OoError err;
@@ -117,8 +119,20 @@ int main(int argc, char *argv[]) {
     return (int) err.tag;
   }
 
+  int exit = 0;
+
+  // mkdir(out_dir, 0700);
+
   if (!look_to_html(&cx, out_dir)) {
     printf("%s\n", "Failed to write html.");
-    return 1;
+    exit = 1;
   }
+
+  raxFree(features);
+  oo_cx_free(&cx);
+  free(out_dir);
+  free(deps_dir);
+  free(mod_dir);
+
+  return exit;
 }
