@@ -3,3 +3,20 @@ type A = <B> => (B, C, Bool)
 type B = I32
 
 type C = U64
+
+type Option = <T> => | Some(T) | None
+
+use Option::None
+
+fn d = () -> () {}
+
+fn e = (foo: U8, opt: Option<C>) -> () {
+  case opt {
+    | Option::Some(inner) {
+      return ()
+    }
+    | None {
+      return ()
+    }
+  }
+}

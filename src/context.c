@@ -974,6 +974,7 @@ static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
         } else {
           err->tag = OO_ERR_NOT_CONST_EXP;
           err->not_const_exp = &asg->items[i].val.exp;
+          ss_free(&ss);
           return;
         }
         break;
@@ -1045,6 +1046,7 @@ static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
     }
 
     if (err->tag != OO_ERR_NONE) {
+      ss_free(&ss);
       return;
     }
   }
@@ -1153,7 +1155,6 @@ static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgT
         b->type_var = &type->generic.args[i];
         ss_add(err, asg, ss, type->generic.args[i].str, b);
         if (err->tag != OO_ERR_NONE) {
-          ss_free(ss);
           return;
         }
       }
@@ -1387,18 +1388,82 @@ static void exp_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgEx
     case EXP_VAL:
       add_pattern_bindings(cx, err, ss, &exp->val, asg);
       break;
-    default:
-      // TODO handle everything explicitly
-      abort();
+    case EXP_VAL_ASSIGN:
+      exp_fine_bindings(cx, err, ss, exp->val_assign.rhs, asg);
+      add_pattern_bindings(cx, err, ss, &exp->val_assign.lhs, asg);
+      break;
+    case EXP_BLOCK:
+      block_fine_bindings(cx, err, ss, &exp->block, asg);
+      break;
+    case EXP_IF:
+      exp_fine_bindings(cx, err, ss, exp->exp_if.cond, asg);
+      block_fine_bindings(cx, err, ss, &exp->exp_if.if_block, asg);
+      block_fine_bindings(cx, err, ss, &exp->exp_if.else_block, asg);
+      break;
+    case EXP_CASE:
+      exp_fine_bindings(cx, err, ss, exp->exp_case.matcher, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+
+      count = sb_count(exp->exp_case.patterns);
+      for (size_t i = 0; i < count; i++) {
+        ss_push_owning(ss, raxNew());
+        add_pattern_bindings(cx, err, ss, &exp->exp_case.patterns[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+        block_fine_bindings(cx, err, ss, &exp->exp_case.blocks[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+        ss_pop(ss);
+      }
+      break;
+    case EXP_WHILE:
+      exp_fine_bindings(cx, err, ss, exp->exp_while.cond, asg);
+      block_fine_bindings(cx, err, ss, &exp->exp_while.block, asg);
+      break;
+    case EXP_LOOP:
+      exp_fine_bindings(cx, err, ss, exp->exp_loop.matcher, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+
+      count = sb_count(exp->exp_loop.patterns);
+      for (size_t i = 0; i < count; i++) {
+        ss_push_owning(ss, raxNew());
+        add_pattern_bindings(cx, err, ss, &exp->exp_loop.patterns[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+        block_fine_bindings(cx, err, ss, &exp->exp_loop.blocks[i], asg);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+        ss_pop(ss);
+      }
+      break;
+    case EXP_RETURN:
+      exp_fine_bindings(cx, err, ss, exp->exp_return, asg);
+      break;
+    case EXP_BREAK:
+      exp_fine_bindings(cx, err, ss, exp->exp_break, asg);
+      break;
+    case EXP_GOTO:
+    case EXP_LABEL:
+      // we can compile to C without properly resolving these... It's ugly, but
+      // it works for the temporary compiler.
+      // TODO don't be lazy, implement proper bindings for labels and goto...
       break;
   }
-
 }
 
 static void block_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgBlock *block, AsgFile *asg) {
-  cx->mods = "TODO remove this";
-  err->tag = OO_ERR_SYNTAX;
-  ss_free(ss);
-  block->exps = NULL;
-  asg->path = "TODO remove this";
+  for (size_t i = 0; i < (size_t) sb_count(block->exps); i++) {
+    exp_fine_bindings(cx, err, ss, &block->exps[i], asg);
+    if (err->tag != OO_ERR_NONE) {
+      return;
+    }
+  }
 }
