@@ -70,6 +70,9 @@ void oo_cx_coarse_bindings(OoContext *cx, OoError *err);
 // Resolves the bindings inside the items of all files.
 void oo_cx_fine_bindings(OoContext *cx, OoError *err);
 
+// Checks that all type-level applications use types of the correct kinds and names.
+void oo_cx_kind_checking(OoContext cx, OoError *err);
+
 // Frees all data owned by the context, including all parsed files and all namespaces.
 // The `mods` and `deps` directory paths are not freed.
 void oo_cx_free(OoContext *cx);

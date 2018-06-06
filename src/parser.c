@@ -3173,6 +3173,20 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       }
 
       t = tokenize(src + l);
+      if (t.tt != COLON) {
+        err->tag = ERR_ITEM;
+        err->tt = t.tt;
+        err->src = src + l;
+        return l;
+      }
+      l += t.len;
+
+      l += parse_type(src + l, err, &data->val.type);
+      if (err->tag != ERR_NONE) {
+        return l;
+      }
+
+      t = tokenize(src + l);
       if (t.tt != EQ) {
         err->tag = ERR_ITEM;
         err->tt = t.tt;
@@ -3470,6 +3484,7 @@ void free_inner_item(AsgItem data) {
       free_inner_type(data.type.type);
       break;
     case ITEM_VAL:
+      free_inner_type(data.val.type);
       free_inner_exp(data.val.exp);
       break;
     case ITEM_FUN:

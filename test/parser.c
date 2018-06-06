@@ -1494,7 +1494,7 @@ void test_item(void) {
   assert(data.type.type.tag == TYPE_PTR);
   free_inner_item(data);
 
-  src = "val a = @b";
+  src = "val a: @A = @b";
   assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
@@ -1502,10 +1502,11 @@ void test_item(void) {
   assert(!data.pub);
   assert(!data.val.mut);
   assert(data.val.sid.str.len == 1);
+  assert(data.val.type.tag == TYPE_PTR);
   assert(data.val.exp.tag == EXP_REF);
   free_inner_item(data);
 
-  src = "pub val mut a = @b";
+  src = "pub val mut a: @A = @b";
   assert(parse_item(src, &err, &data, asg) == strlen(src));
   assert(err.tag == ERR_NONE);
   assert(data.str.len == strlen(src));
@@ -1513,6 +1514,7 @@ void test_item(void) {
   assert(data.pub);
   assert(data.val.mut);
   assert(data.val.sid.str.len == 1);
+  assert(data.val.type.tag == TYPE_PTR);
   assert(data.val.exp.tag == EXP_REF);
   free_inner_item(data);
 

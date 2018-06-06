@@ -13,7 +13,7 @@
 // write files with spans for syntax highlighting and ids linking to their binding
 // write files for directories?
 
-void render_file(OoContext *cx, AsgFile *asg, FILE *f);
+void render_file(AsgFile *asg, FILE *f);
 
 // Determine where to render the AsgFile of the given path, and open that file.
 FILE  *open_file(OoContext *cx, const char *src_path, const char *out_dir) {
@@ -59,16 +59,89 @@ bool look_to_html(OoContext *cx, const char *out_dir) {
       return false;
     }
 
-    render_file(cx, cx->files[i], f);
+    render_file(cx->files[i], f);
     fclose(f);
   }
 
   return true;
 }
 
-void render_file(OoContext *cx, AsgFile *asg, FILE *f) {
-  fprintf(f, "%s\n", "hi!"); // TODO
-  printf("%s, %s\n", cx->mods, asg->path);
+const char *render_item(AsgItem *item, FILE *f) {
+  fprintf(f, "<span class=\"item ");
+  switch (item->tag) {
+    case ITEM_USE:
+      fprintf(f, "item_use");
+      break;
+    case ITEM_TYPE:
+      fprintf(f, "item_type");
+      break;
+    case ITEM_VAL:
+      fprintf(f, "item_val");
+      break;
+    case ITEM_FUN:
+      fprintf(f, "item_fun");
+      break;
+    case ITEM_FFI_INCLUDE:
+      fprintf(f, "item_ffi_include");
+      break;
+    case ITEM_FFI_VAL:
+      fprintf(f, "item_ffi_val");
+      break;
+  }
+  fprintf(f, "\">");
+
+  const char *src = item->str.start;
+  while (*src == ' ' || *src == '\n') {
+    fprintf(f, "%c", *src);
+    src += 1;
+  }
+
+  switch (item->tag) {
+    case ITEM_USE:
+      fprintf(f, "<span class=\"kw kw_use\">use</span>");
+      src += 3;
+      break;
+    case ITEM_TYPE:
+      fprintf(f, "<span class=\"kw kw_type\">type</span>");
+      src += 4;
+      break;
+    case ITEM_VAL:
+      fprintf(f, "<span class=\"kw kw_val\">val</span>");
+      src += 3;
+      break;
+    case ITEM_FUN:
+      fprintf(f, "<span class=\"kw kw_fn\">fn</span>");
+      src += 2;
+      break;
+    case ITEM_FFI_INCLUDE:
+      fprintf(f, "item_ffi_include"); // TODO
+      break;
+    case ITEM_FFI_VAL:
+      fprintf(f, "item_ffi_val"); // TODO
+      break;
+  }
+
+
+
+  fprintf(f, "%s", "render_item"); // TODO
+
+  fprintf(f, "</span>");
+  return item->str.start + item->str.len;
+}
+
+void render_file(AsgFile *asg, FILE *f) {
+  const char *src = asg->str.start;
+  size_t i = 0;
+
+  while (src < asg->str.start + asg->str.len) {
+    if (src < asg->items[i].str.start) {
+      fprintf(f, "%c", *src);
+      src += 1;
+    } else {
+      src = render_item(&asg->items[i], f);
+      i += 1;
+    }
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -121,7 +194,7 @@ int main(int argc, char *argv[]) {
 
   int exit = 0;
 
-  // mkdir(out_dir, 0700);
+  mkdir(out_dir, 0700);
 
   if (!look_to_html(&cx, out_dir)) {
     printf("%s\n", "Failed to write html.");

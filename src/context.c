@@ -1066,6 +1066,11 @@ static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
         break;
       case ITEM_VAL:
         if (is_item_val(&asg->items[i].val.exp)) {
+          type_fine_bindings(cx, err, &ss, &asg->items[i].val.type, asg);
+          if (err->tag != OO_ERR_NONE) {
+            ss_free(&ss);
+            return;
+          }
           exp_fine_bindings(cx, err, &ss, &asg->items[i].val.exp, asg);
         } else {
           err->tag = OO_ERR_NOT_CONST_EXP;

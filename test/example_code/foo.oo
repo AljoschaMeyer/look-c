@@ -1,6 +1,6 @@
 pub type a = b
 
-val c = d
+val c: C = d
 
 use mod::dir::bar::a as e
 use mod::dir::bar::qux

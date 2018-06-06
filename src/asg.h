@@ -589,6 +589,7 @@ typedef struct AsgExp {
 typedef struct AsgItemVal {
   bool mut;
   AsgSid sid;
+  AsgType type;
   AsgExp exp;
 } AsgItemVal;
 
