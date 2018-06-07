@@ -121,10 +121,13 @@ void test_fine_bindings(void) {
     assert(cx.files[0]->items[0].type.type.generic.inner->product_anon[1].id.sids[0].binding.tag == BINDING_TYPE);
     assert(
       cx.files[0]->items[0].type.type.generic.inner->product_anon[1].id.sids[0].binding.type ==
-      &cx.files[0]->items[2]
+      &cx.files[0]->items[2].type
     );
 
     assert(cx.files[0]->items[0].type.type.generic.inner->product_anon[2].id.sids[0].binding.tag == BINDING_PRIMITIVE);
+
+    oo_cx_kind_checking(&cx, &err);
+    assert(err.tag == OO_ERR_NONE);
 
     raxFree(features);
     oo_cx_free(&cx);

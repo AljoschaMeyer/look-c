@@ -30,6 +30,10 @@ typedef struct AsgTypeSum AsgTypeSum;
 typedef struct AsgSummand AsgSummand;
 typedef struct AsgSid AsgSid;
 typedef struct AsgPatternId AsgPatternId;
+typedef struct AsgItemType AsgItemType;
+typedef struct AsgItemVal AsgItemVal;
+typedef struct AsgItemFun AsgItemFun;
+typedef struct AsgItemFfiVal AsgItemFfiVal;
 
 typedef enum {
   PRIM_U8,
@@ -79,10 +83,10 @@ typedef struct AsgBinding {
   bool private; // If false, the non-public information of the binding should not be accessed.
   AsgFile *file; // File in which the binding is defined. NULL for directories, mod, dep, primitives, etc.
   union {
-    AsgItem *type;
-    AsgItem *val;
-    AsgItem *fun;
-    AsgItem *ffi_val;
+    AsgItemType *type;
+    AsgItemVal *val;
+    AsgItemFun *fun;
+    AsgItemFfiVal *ffi_val;
     AsgNS *ns;
     AsgBindingSum sum;
     AsgSummand *summand;
@@ -92,6 +96,8 @@ typedef struct AsgBinding {
     AsgPatternId *pattern_id;
   };
 } AsgBinding;
+
+bool is_type_binding(AsgBinding b);
 
 typedef enum {
   NS_FILE,

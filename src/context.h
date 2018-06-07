@@ -12,7 +12,9 @@ typedef enum {
   OO_ERR_DUP_ID_ITEM, OO_ERR_DUP_ID_ITEM_USE, OO_ERR_INVALID_BRANCH,
   OO_ERR_NONEXISTING_SID_USE, OO_ERR_NONEXISTING_SID, OO_ERR_ID_NOT_A_NS,
   OO_ERR_ID_NOT_IN_NS, OO_ERR_BINDING_NOT_TYPE, OO_ERR_BINDING_NOT_EXP,
-  OO_ERR_DUP_ID_SCOPE, OO_ERR_BINDING_NOT_SUMMAND, OO_ERR_NOT_CONST_EXP
+  OO_ERR_DUP_ID_SCOPE, OO_ERR_BINDING_NOT_SUMMAND, OO_ERR_NOT_CONST_EXP,
+  OO_ERR_WRONG_NUMBER_OF_TYPE_ARGS, OO_ERR_HIGHER_ORDER_TYPE_ARG,
+  OO_ERR_NAMED_TYPE_APP_SID
 } OoErrorTag;
 
 typedef struct OoError {
@@ -34,6 +36,9 @@ typedef struct OoError {
     Str dup_id_scope;
     AsgId *binding_not_summand;
     AsgExp *not_const_exp;
+    AsgType *wrong_number_of_type_args; // TYPE_APP_ANON or TYPE_APP_NAMED
+    AsgType *higher_order_type_arg;
+    AsgSid *named_type_app_sid;
   };
 } OoError;
 
@@ -71,7 +76,7 @@ void oo_cx_coarse_bindings(OoContext *cx, OoError *err);
 void oo_cx_fine_bindings(OoContext *cx, OoError *err);
 
 // Checks that all type-level applications use types of the correct kinds and names.
-void oo_cx_kind_checking(OoContext cx, OoError *err);
+void oo_cx_kind_checking(OoContext *cx, OoError *err);
 
 // Frees all data owned by the context, including all parsed files and all namespaces.
 // The `mods` and `deps` directory paths are not freed.

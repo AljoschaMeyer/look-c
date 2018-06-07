@@ -15,6 +15,13 @@
 #include "stretchy_buffer.h"
 #include "util.h"
 
+bool is_type_binding(AsgBinding b) {
+  return b.tag == BINDING_TYPE ||
+  b.tag == BINDING_SUM_TYPE ||
+  b.tag == BINDING_TYPE_VAR ||
+  b.tag == BINDING_PRIMITIVE;
+}
+
 static void print_location(Str loc, Str file) {
   size_t line = 0;
   size_t col = 0;
@@ -82,7 +89,16 @@ void err_print(OoError *err) {
       printf("%s\n", "binding is not a summand error");
       break;
     case OO_ERR_NOT_CONST_EXP:
-      printf("%s\n", "invlid top level val error");
+      printf("%s\n", "invalid top level val (not a constant expression) error");
+      break;
+    case OO_ERR_WRONG_NUMBER_OF_TYPE_ARGS:
+      printf("%s\n", "wrong number of type args error");
+      break;
+    case OO_ERR_HIGHER_ORDER_TYPE_ARG:
+      printf("%s\n", "higher order type arg error");
+      break;
+    case OO_ERR_NAMED_TYPE_APP_SID:
+      printf("%s\n", "named type application sid error");
       break;
   }
 
@@ -216,6 +232,18 @@ void err_print(OoError *err) {
     case OO_ERR_NOT_CONST_EXP:
       print_location(err->not_const_exp->str, err->asg->str);
       str_print(err->not_const_exp->str);
+      break;
+    case OO_ERR_WRONG_NUMBER_OF_TYPE_ARGS:
+      print_location(err->wrong_number_of_type_args->str, err->asg->str);
+      str_print(err->wrong_number_of_type_args->str);
+      break;
+    case OO_ERR_HIGHER_ORDER_TYPE_ARG:
+      print_location(err->higher_order_type_arg->str, err->asg->str);
+      str_print(err->higher_order_type_arg->str);
+      break;
+    case OO_ERR_NAMED_TYPE_APP_SID:
+      print_location(err->named_type_app_sid->str, err->asg->str);
+      str_print(err->named_type_app_sid->str);
       break;
   }
 }
@@ -674,7 +702,7 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
             asg->ns.bindings[i + 16].tag = BINDING_TYPE; // later overwritten for sum types
             asg->ns.bindings[i + 16].private = true;
             asg->ns.bindings[i + 16].file = asg;
-            asg->ns.bindings[i + 16].type = &asg->items[i]; // later overwritten for sum types
+            asg->ns.bindings[i + 16].type = &asg->items[i].type; // later overwritten for sum types
 
             // handle sum type namespaces
             bool is_sum = false;
@@ -740,21 +768,21 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
             asg->ns.bindings[i + 16].tag = BINDING_VAL;
             asg->ns.bindings[i + 16].private = true;
             asg->ns.bindings[i + 16].file = asg;
-            asg->ns.bindings[i + 16].val = &asg->items[i];
+            asg->ns.bindings[i + 16].val = &asg->items[i].val;
             break;
           case ITEM_FUN:
             str = asg->items[i].fun.sid.str;
             asg->ns.bindings[i + 16].tag = BINDING_FUN;
             asg->ns.bindings[i + 16].private = true;
             asg->ns.bindings[i + 16].file = asg;
-            asg->ns.bindings[i + 16].fun = &asg->items[i];
+            asg->ns.bindings[i + 16].fun = &asg->items[i].fun;
             break;
           case ITEM_FFI_VAL:
             str = asg->items[i].ffi_val.sid.str;
             asg->ns.bindings[i + 16].tag = BINDING_FFI_VAL;
             asg->ns.bindings[i + 16].private = true;
             asg->ns.bindings[i + 16].file = asg;
-            asg->ns.bindings[i + 16].ffi_val = &asg->items[i];
+            asg->ns.bindings[i + 16].ffi_val = &asg->items[i].ffi_val;
             break;
           default:
             abort(); // unreachable
@@ -1162,12 +1190,7 @@ static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgT
   switch (type->tag) {
     case TYPE_ID:
       id_fine_bindings(cx, err, ss, &type->id, asg);
-      if (
-        err->tag == OO_ERR_NONE &&
-        type->id.binding.tag != BINDING_TYPE &&
-        type->id.binding.tag != BINDING_TYPE_VAR &&
-        type->id.binding.tag != BINDING_PRIMITIVE
-      ) {
+      if (err->tag == OO_ERR_NONE && !is_type_binding(type->id.binding)) {
         err->tag = OO_ERR_BINDING_NOT_TYPE;
         err->binding_not_type = &type->id;
         return;
@@ -1228,6 +1251,11 @@ static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgT
       break;
     case TYPE_APP_ANON:
       id_fine_bindings(cx, err, ss, &type->app_anon.tlf, asg);
+      if (err->tag == OO_ERR_NONE && !is_type_binding(type->app_anon.tlf.binding)) {
+        err->tag = OO_ERR_BINDING_NOT_TYPE;
+        err->binding_not_type = &type->app_anon.tlf;
+        return;
+      }
 
       count = sb_count(type->app_anon.args);
       for (size_t i = 0; i < count; i++) {
@@ -1239,6 +1267,11 @@ static void type_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgT
       break;
     case TYPE_APP_NAMED:
       id_fine_bindings(cx, err, ss, &type->app_named.tlf, asg);
+      if (err->tag == OO_ERR_NONE && !is_type_binding(type->app_named.tlf.binding)) {
+        err->tag = OO_ERR_BINDING_NOT_TYPE;
+        err->binding_not_type = &type->app_named.tlf;
+        return;
+      }
 
       count = sb_count(type->app_named.types);
       for (size_t i = 0; i < count; i++) {
@@ -1494,6 +1527,10 @@ static void exp_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgEx
       break;
     case EXP_VAL_ASSIGN:
       exp_fine_bindings(cx, err, ss, exp->val_assign.rhs, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+
       add_pattern_bindings(cx, err, ss, &exp->val_assign.lhs, asg);
       break;
     case EXP_BLOCK:
@@ -1501,7 +1538,15 @@ static void exp_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgEx
       break;
     case EXP_IF:
       exp_fine_bindings(cx, err, ss, exp->exp_if.cond, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+
       block_fine_bindings(cx, err, ss, &exp->exp_if.if_block, asg);
+      if (err->tag != OO_ERR_NONE) {
+        return;
+      }
+
       block_fine_bindings(cx, err, ss, &exp->exp_if.else_block, asg);
       break;
     case EXP_CASE:
