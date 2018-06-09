@@ -35,6 +35,8 @@ typedef struct AsgItemVal AsgItemVal;
 typedef struct AsgItemFun AsgItemFun;
 typedef struct AsgItemFfiVal AsgItemFfiVal;
 
+typedef struct OoType OoType;
+
 typedef enum {
   PRIM_U8,
   PRIM_U16,
@@ -121,6 +123,72 @@ typedef struct AsgNS {
 } AsgNS;
 
 void free_ns(AsgNS ns);
+
+typedef enum {
+  OO_TYPE_UNINITIALIZED, // defaul value before type checking
+  OO_TYPE_BINDING,
+  OO_TYPE_PTR,
+  OO_TYPE_PTR_MUT,
+  OO_TYPE_ARRAY,
+  OO_TYPE_PRODUCT_REPEATED,
+  OO_TYPE_PRODUCT_ANON,
+  OO_TYPE_PRODUCT_NAMED,
+  OO_TYPE_FUN_ANON,
+  OO_TYPE_FUN_NAMED,
+  OO_TYPE_SUM,
+  OO_TYPE_GENERIC,
+  OO_TYPE_APP
+} OoTypeTag;
+
+typedef struct OoTypeProductRepeated {
+  OoType *inner;
+  uint32_t repetitions;
+} OoTypeProductRepeated;
+
+typedef struct OoTypeProductNamed {
+  OoType *types; // stretchy buffer
+  AsgSid *sids; // stretchy buffer, same length as inners
+} OoTypeProductNamed;
+
+typedef struct OoTypeFunAnon {
+  OoType *args; // stretchy buffer
+  OoType *ret;
+} OoTypeFunAnon;
+
+typedef struct OoTypeFunNamed {
+  OoType *arg_types; // stretchy buffer
+  AsgSid *arg_sids; // stretchy buffer, same length as arg_types
+  OoType *ret;
+} OoTypeFunNamed;
+
+typedef struct OoTypeGeneric {
+  size_t generic_args;
+  OoType *inner;
+} OoTypeGeneric;
+
+typedef struct OoTypeApp {
+  OoTypeGeneric *tlf; // not owning
+  OoType *args; // stretchy buffer
+} OoTypeApp;
+
+typedef struct OoType {
+  OoTypeTag tag;
+  union {
+    AsgBinding binding;
+    OoType *ptr;
+    OoType *ptr_mut;
+    OoType *array;
+    OoTypeProductRepeated product_repeated;
+    OoType *product_anon; // stretchy buffer
+    OoTypeProductNamed product_named;
+    OoTypeFunAnon fun_anon;
+    OoTypeFunNamed fun_named;
+    AsgTypeSum *sum;
+    OoTypeGeneric generic;
+    OoTypeApp app;
+    uint32_t arg; // A type argument of an OoTypeGeneric, identified by its index
+  };
+} OoType; // TODO mutability?
 
 // A simple identifier
 typedef struct AsgSid {
@@ -359,6 +427,7 @@ typedef struct AsgType {
 typedef struct AsgItemType {
   AsgSid sid;
   AsgType type;
+  OoType oo_type;
 } AsgItemType;
 
 typedef enum {
@@ -597,6 +666,7 @@ typedef struct AsgItemVal {
   AsgSid sid;
   AsgType type;
   AsgExp exp;
+  OoType oo_type;
 } AsgItemVal;
 
 typedef struct AsgItemFun {
@@ -606,6 +676,7 @@ typedef struct AsgItemFun {
   AsgType *arg_types; // stretchy buffer, same length as arg_sids
   AsgType ret; // empty anon product if return type is omitted in the syntax
   AsgBlock body;
+  OoType oo_type;
 } AsgItemFun;
 
 typedef struct AsgItemFfiInclude {
@@ -616,6 +687,7 @@ typedef struct AsgItemFfiVal {
   bool mut;
   AsgSid sid;
   AsgType type;
+  OoType oo_type;
 } AsgItemFfiVal;
 
 typedef struct AsgItem {

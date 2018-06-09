@@ -3155,6 +3155,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       }
 
       data->tag = ITEM_TYPE;
+      data->type.oo_type.tag = OO_TYPE_UNINITIALIZED;
       data->str.len = l;
       return l;
     case VAL:
@@ -3201,6 +3202,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       }
 
       data->tag = ITEM_VAL;
+      data->val.oo_type.tag = OO_TYPE_UNINITIALIZED;
       data->str.len = l;
       return l;
     case FN:
@@ -3397,6 +3399,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       }
 
       data->tag = ITEM_FUN;
+      data->fun.oo_type.tag = OO_TYPE_UNINITIALIZED;
       data->str.len = l;
       return l;
     case FFI:
@@ -3463,6 +3466,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         }
 
         data->tag = ITEM_FFI_VAL;
+        data->ffi_val.oo_type.tag = OO_TYPE_UNINITIALIZED;
         data->str.len = l;
         return l;
       }
@@ -3475,6 +3479,66 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
   }
 }
 
+void free_sb_oo_types(OoType *sb) {
+  int i;
+  int count = sb_count(sb);
+  for (i = 0; i < count; i++) {
+    free_inner_oo_type(sb[i]);
+  }
+  sb_free(sb);
+}
+
+void free_inner_oo_type(OoType t) {
+  switch (t.tag) {
+    case OO_TYPE_UNINITIALIZED:
+    case OO_TYPE_BINDING:
+    case OO_TYPE_SUM:
+      // noop
+      break;
+    case OO_TYPE_PTR:
+      free_inner_oo_type(*t.ptr);
+      free(t.ptr);
+      break;
+    case OO_TYPE_PTR_MUT:
+      free_inner_oo_type(*t.ptr_mut);
+      free(t.ptr_mut);
+      break;
+    case OO_TYPE_ARRAY:
+      free_inner_oo_type(*t.array);
+      free(t.array);
+      break;
+    case OO_TYPE_PRODUCT_REPEATED:
+      free_inner_oo_type(*t.product_repeated.inner);
+      free(t.product_repeated.inner);
+      break;
+    case OO_TYPE_PRODUCT_ANON:
+      free_sb_oo_types(t.product_anon);
+      break;
+    case OO_TYPE_PRODUCT_NAMED:
+      free_sb_oo_types(t.product_named.types);
+      // sids are shared with the syntax graph and freed by it
+      break;
+    case OO_TYPE_FUN_ANON:
+      free_sb_oo_types(t.fun_anon.args);
+      free_inner_oo_type(*t.fun_anon.ret);
+      free(t.fun_anon.ret);
+      break;
+    case OO_TYPE_FUN_NAMED:
+      free_sb_oo_types(t.fun_named.arg_types);
+      // sids are shared with the syntax graph and freed by it
+      free_inner_oo_type(*t.fun_named.ret);
+      free(t.fun_named.ret);
+      break;
+    case OO_TYPE_GENERIC:
+      free_inner_oo_type(*t.generic.inner);
+      free(t.generic.inner);
+      break;
+    case OO_TYPE_APP:
+      free_sb_oo_types(t.app.args);
+      break;
+  }
+}
+
 void free_inner_item(AsgItem data) {
   switch (data.tag) {
     case ITEM_USE:
@@ -3482,10 +3546,12 @@ void free_inner_item(AsgItem data) {
       break;
     case ITEM_TYPE:
       free_inner_type(data.type.type);
+      free_inner_oo_type(data.type.oo_type);
       break;
     case ITEM_VAL:
       free_inner_type(data.val.type);
       free_inner_exp(data.val.exp);
+      free_inner_oo_type(data.val.oo_type);
       break;
     case ITEM_FUN:
       sb_free(data.fun.type_args);
@@ -3493,9 +3559,11 @@ void free_inner_item(AsgItem data) {
       free_sb_types(data.fun.arg_types);
       free_inner_type(data.fun.ret);
       free_inner_block(data.fun.body);
+      free_inner_oo_type(data.fun.oo_type);
       break;
     case ITEM_FFI_VAL:
       free_inner_type(data.ffi_val.type);
+      free_inner_oo_type(data.fun.oo_type);
       break;
     case ITEM_FFI_INCLUDE:
       break;

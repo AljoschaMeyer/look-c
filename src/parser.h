@@ -81,4 +81,6 @@ void free_inner_file(AsgFile data);
 void free_sb_meta(AsgMeta *sb);
 void free_sb_exp(AsgExp *sb);
 
+void free_inner_oo_type(OoType t);
+
 #endif

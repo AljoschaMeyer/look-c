@@ -129,6 +129,9 @@ void test_fine_bindings(void) {
     oo_cx_kind_checking(&cx, &err);
     assert(err.tag == OO_ERR_NONE);
 
+    oo_cx_type_checking(&cx, &err);
+    assert(err.tag == OO_ERR_NONE);
+
     raxFree(features);
     oo_cx_free(&cx);
 }

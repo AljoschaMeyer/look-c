@@ -1,4 +1,6 @@
 #include <assert.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #include "asg.h"
 #include "stretchy_buffer.h"
@@ -513,6 +515,225 @@ void oo_cx_kind_checking(OoContext *cx, OoError *err) {
   int count = sb_count(cx->files);
   for (int i = 0; i < count; i++) {
     file_kind_checking(cx, err, cx->files[i]);
+    if (err->tag != OO_ERR_NONE) {
+      return;
+    }
+  }
+}
+
+// Compute the OoType corresponding to an AsgType. This can recursively invoke
+// itself as needed, if the OoType for a binding site is OO_TYPE_UNINITIALIZED.
+static void asg_type_to_oo_type(OoContext *cx, OoError *err, AsgType *asg_type, OoType *oo_type) {
+  int count;
+  switch (asg_type->tag) {
+    case TYPE_ID:
+      oo_type->tag = OO_TYPE_BINDING;
+      oo_type->binding = asg_type->id.binding;
+      break;
+    case TYPE_MACRO:
+      // noop
+      break;
+    case TYPE_PTR:
+      oo_type->tag = OO_TYPE_PTR;
+      oo_type->ptr = malloc(sizeof(OoType));
+      asg_type_to_oo_type(cx, err, asg_type->ptr, oo_type->ptr);
+      break;
+    case TYPE_PTR_MUT:
+      oo_type->tag = OO_TYPE_PTR_MUT;
+      oo_type->ptr_mut = malloc(sizeof(OoType));
+      asg_type_to_oo_type(cx, err, asg_type->ptr_mut, oo_type->ptr_mut);
+      break;
+    case TYPE_ARRAY:
+      oo_type->tag = OO_TYPE_ARRAY;
+      oo_type->array = malloc(sizeof(OoType));
+      asg_type_to_oo_type(cx, err, asg_type->array, oo_type->array);
+      break;
+    case TYPE_PRODUCT_REPEATED:
+      oo_type->tag = OO_TYPE_PRODUCT_REPEATED;
+      oo_type->product_repeated.inner = malloc(sizeof(OoType));
+      asg_type_to_oo_type(cx, err, asg_type->product_repeated.inner, oo_type->product_repeated.inner);
+      switch (asg_type->product_repeated.repeat.tag) {
+        case REPEAT_INT:
+          oo_type->product_repeated.repetitions = strtoul(asg_type->product_repeated.repeat.str.start, NULL, 10);
+          break;
+        default:
+          printf("%s\n", "Complex repeats not yet implemented, specify an integer literal directly.");
+          exit(1);
+      }
+      break;
+    case TYPE_PRODUCT_ANON:
+      oo_type->tag = OO_TYPE_PRODUCT_ANON;
+      count = sb_count(asg_type->product_anon);
+      oo_type->product_anon = NULL;
+      sb_add(oo_type->product_anon, count);
+
+      for (size_t i = 0; i < (size_t) count; i++) {
+        asg_type_to_oo_type(cx, err, &asg_type->product_anon[i], &oo_type->product_anon[i]);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case TYPE_PRODUCT_NAMED:
+      oo_type->tag = OO_TYPE_PRODUCT_NAMED;
+      count = sb_count(asg_type->product_named.types);
+      oo_type->product_named.types = NULL;
+      sb_add(oo_type->product_named.types, count);
+      oo_type->product_named.sids = asg_type->product_named.sids;
+
+      for (size_t i = 0; i < (size_t) count; i++) {
+        asg_type_to_oo_type(cx, err, &asg_type->product_named.types[i], &oo_type->product_named.types[i]);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case TYPE_FUN_ANON:
+      oo_type->tag = OO_TYPE_FUN_ANON;
+      count = sb_count(asg_type->fun_anon.args);
+      oo_type->fun_anon.args = NULL;
+      sb_add(oo_type->fun_anon.args, count);
+
+      for (size_t i = 0; i < (size_t) count; i++) {
+        asg_type_to_oo_type(cx, err, &asg_type->fun_anon.args[i], &oo_type->fun_anon.args[i]);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+
+      oo_type->fun_anon.ret = malloc(sizeof(OoType));
+      asg_type_to_oo_type(cx, err, asg_type->fun_anon.ret, oo_type->fun_anon.ret);
+      break;
+    case TYPE_FUN_NAMED:
+      oo_type->tag = OO_TYPE_FUN_NAMED;
+      count = sb_count(asg_type->fun_named.arg_types);
+      oo_type->fun_named.arg_types = NULL;
+      sb_add(oo_type->fun_named.arg_types, count);
+      oo_type->fun_named.arg_sids = asg_type->fun_named.arg_sids;
+
+      for (size_t i = 0; i < (size_t) count; i++) {
+        asg_type_to_oo_type(cx, err, &asg_type->fun_named.arg_types[i], &oo_type->fun_named.arg_types[i]);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+
+      oo_type->fun_named.ret = malloc(sizeof(OoType));
+      asg_type_to_oo_type(cx, err, asg_type->fun_named.ret, oo_type->fun_named.ret);
+      break;
+    case TYPE_SUM:
+      oo_type->tag = OO_TYPE_SUM;
+      oo_type->sum = &asg_type->sum;
+      break;
+    case TYPE_GENERIC:
+      oo_type->tag = OO_TYPE_GENERIC;
+      oo_type->generic.generic_args = sb_count(asg_type->generic.args);
+      oo_type->generic.inner = malloc(sizeof(OoType));
+      asg_type_to_oo_type(cx, err, asg_type->generic.inner, oo_type->generic.inner);
+      break;
+    case TYPE_APP_ANON:
+      oo_type->tag = OO_TYPE_APP;
+      oo_type->app.args = NULL;
+      count = sb_count(asg_type->app_anon.args);
+      sb_add(oo_type->app.args, count);
+
+      switch (asg_type->app_anon.tlf.binding.tag) {
+        case BINDING_TYPE:
+          assert(asg_type->app_anon.tlf.binding.type->oo_type.tag == OO_TYPE_GENERIC);
+          oo_type->app.tlf = &asg_type->app_anon.tlf.binding.type->oo_type.generic;
+          break;
+        case BINDING_SUM_TYPE:
+          assert(asg_type->app_anon.tlf.binding.sum.type->type.oo_type.tag == OO_TYPE_GENERIC);
+          oo_type->app.tlf = &asg_type->app_anon.tlf.binding.sum.type->type.oo_type.generic;
+          break;
+        default:
+          abort();
+      }
+
+      for (size_t i = 0; i < (size_t) count; i++) {
+        asg_type_to_oo_type(cx, err, &asg_type->app_anon.args[i], &oo_type->app.args[i]);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+    case TYPE_APP_NAMED:
+      oo_type->tag = OO_TYPE_APP;
+      oo_type->app.args = NULL;
+      count = sb_count(asg_type->app_named.types);
+      sb_add(oo_type->app.args, count);
+
+      assert(asg_type->app_named.tlf.binding.tag == BINDING_TYPE);
+      assert(asg_type->app_named.tlf.binding.type->oo_type.tag == OO_TYPE_GENERIC);
+      oo_type->app.tlf = &asg_type->app_named.tlf.binding.type->oo_type.generic;
+
+      for (size_t i = 0; i < (size_t) count; i++) {
+        asg_type_to_oo_type(cx, err, &asg_type->app_named.types[i], &oo_type->app.args[i]);
+        if (err->tag != OO_ERR_NONE) {
+          return;
+        }
+      }
+      break;
+  }
+}
+
+static void file_coarse_types(OoContext *cx, OoError *err, AsgFile *asg) {
+  err->asg = asg;
+  size_t count = sb_count(asg->items);
+  for (size_t i = 0; i < count; i++) {
+    switch (asg->items[i].tag) {
+      case ITEM_TYPE:
+        asg_type_to_oo_type(cx, err, &asg->items[i].type.type, &asg->items[i].type.oo_type);
+        break;
+      case ITEM_VAL:
+        asg_type_to_oo_type(cx, err, &asg->items[i].val.type, &asg->items[i].val.oo_type);
+        break;
+      case ITEM_FUN:
+        asg->items[i].fun.oo_type.tag = OO_TYPE_FUN_NAMED;
+        asg->items[i].fun.oo_type.fun_named.arg_types = NULL;
+        sb_add(asg->items[i].fun.oo_type.fun_named.arg_types, sb_count(asg->items[i].fun.arg_types));
+        asg->items[i].fun.oo_type.fun_named.arg_sids = asg->items[i].fun.arg_sids;
+
+        for (size_t j = 0; j < (size_t) sb_count(asg->items[i].fun.arg_types); j++) {
+          asg_type_to_oo_type(
+            cx, err, &asg->items[i].fun.arg_types[j], &asg->items[i].fun.oo_type.fun_named.arg_types[j]
+          );
+          if (err->tag != OO_ERR_NONE) {
+            return;
+          }
+        }
+
+        asg->items[i].fun.oo_type.fun_named.ret = malloc(sizeof(OoType));
+        asg_type_to_oo_type(cx, err, &asg->items[i].fun.ret, asg->items[i].fun.oo_type.fun_named.ret);
+        break;
+      case ITEM_FFI_VAL:
+        asg_type_to_oo_type(cx, err, &asg->items[i].ffi_val.type, &asg->items[i].ffi_val.oo_type);
+        break;
+      case ITEM_USE:
+      case ITEM_FFI_INCLUDE:
+        // noop
+        break;
+    }
+
+    if (err->tag != OO_ERR_NONE) {
+      return;
+    }
+  }
+}
+
+
+// Type checking overview: OoType represents a type. For each item, the type can
+// be derived from the annotation, so this is done in a first step (`file_coarse_types`).
+// Next, the items need to be checked agains their coarse type. For functions,
+// this involves typechecking the function body.
+//
+// // In function bodies, there is a (pretty limited) form of type inference, so
+// // there are some tags that represent types that still need to be inferred. When
+// // these are encountered, a callback is supplied that later sets the correct type.
+void oo_cx_type_checking(OoContext *cx, OoError *err) {
+  int count = sb_count(cx->files);
+  for (int i = 0; i < count; i++) {
+    file_coarse_types(cx, err, cx->files[i]);
     if (err->tag != OO_ERR_NONE) {
       return;
     }
