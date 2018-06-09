@@ -3202,7 +3202,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       }
 
       data->tag = ITEM_VAL;
-      data->val.oo_type.tag = OO_TYPE_UNINITIALIZED;
+      data->val.sid.binding.val.oo_type.tag = OO_TYPE_UNINITIALIZED;
       data->str.len = l;
       return l;
     case FN:
@@ -3290,11 +3290,22 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       t = tokenize(src + l);
       if (t.tt == RPAREN) {
         data->fun.arg_sids = NULL;
+        data->fun.arg_muts = NULL;
         data->fun.arg_types = NULL;
         l += t.len;
       } else {
         AsgSid *sids = NULL;
+        bool *muts = NULL;
         AsgType *types = NULL;
+
+        bool *mut = sb_add(muts, 1);
+        t = tokenize(src + l);
+        if (t.tt == MUT) {
+          *mut = true;
+          l += t.len;
+        } else {
+          *mut = false;
+        }
 
         AsgSid *sid = sb_add(sids, 1);
         l += parse_sid(src + l, err, sid);
@@ -3307,6 +3318,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
           err->src = src + l;
           sb_free(data->fun.type_args);
           sb_free(sids);
+          sb_free(muts);
           free_sb_types(types);
           return l;
         }
@@ -3317,6 +3329,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         if (err->tag != ERR_NONE) {
           sb_free(data->fun.type_args);
           sb_free(sids);
+          sb_free(muts);
           free_sb_types(types);
           return l;
         }
@@ -3324,11 +3337,21 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         l += t.len;
 
         while (t.tt == COMMA) {
+          mut = sb_add(muts, 1);
+          t = tokenize(src + l);
+          if (t.tt == MUT) {
+            *mut = true;
+            l += t.len;
+          } else {
+            *mut = false;
+          }
+
           sid = sb_add(sids, 1);
           l += parse_sid(src + l, err, sid);
           if (err->tag != ERR_NONE) {
             sb_free(data->fun.type_args);
             sb_free(sids);
+            sb_free(muts);
             free_sb_types(types);
             return l;
           }
@@ -3341,6 +3364,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
             err->src = src + l;
             sb_free(data->fun.type_args);
             sb_free(sids);
+            sb_free(muts);
             free_sb_types(types);
             return l;
           }
@@ -3350,6 +3374,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
           if (err->tag != ERR_NONE) {
             sb_free(data->fun.type_args);
             sb_free(sids);
+            sb_free(muts);
             free_sb_types(types);
             return l;
           }
@@ -3364,11 +3389,13 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
           err->src = src + l;
           sb_free(data->fun.type_args);
           sb_free(sids);
+          sb_free(muts);
           free_sb_types(types);
           return l;
         }
         l += t.len;
         data->fun.arg_sids = sids;
+        data->fun.arg_muts = muts;
         data->fun.arg_types = types;
       }
 
@@ -3378,6 +3405,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         l += parse_type(src + l, err, &data->fun.ret);
         if (err->tag != ERR_NONE) {
           sb_free(data->fun.type_args);
+          sb_free(data->fun.arg_muts);
           sb_free(data->fun.arg_sids);
           free_sb_types(data->fun.arg_types);
           return l;
@@ -3392,6 +3420,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       l += parse_block(src + l, err, &data->fun.body);
       if (err->tag != ERR_NONE) {
         sb_free(data->fun.type_args);
+        sb_free(data->fun.arg_muts);
         sb_free(data->fun.arg_sids);
         free_sb_types(data->fun.arg_types);
         free_inner_type(data->fun.ret);
@@ -3399,7 +3428,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
       }
 
       data->tag = ITEM_FUN;
-      data->fun.oo_type.tag = OO_TYPE_UNINITIALIZED;
+      data->fun.sid.binding.val.oo_type.tag = OO_TYPE_UNINITIALIZED;
       data->str.len = l;
       return l;
     case FFI:
@@ -3466,7 +3495,7 @@ size_t parse_item(const char *src, ParserError *err, AsgItem *data, AsgFile *asg
         }
 
         data->tag = ITEM_FFI_VAL;
-        data->ffi_val.oo_type.tag = OO_TYPE_UNINITIALIZED;
+        data->ffi_val.sid.binding.val.oo_type.tag = OO_TYPE_UNINITIALIZED;
         data->str.len = l;
         return l;
       }
@@ -3551,19 +3580,20 @@ void free_inner_item(AsgItem data) {
     case ITEM_VAL:
       free_inner_type(data.val.type);
       free_inner_exp(data.val.exp);
-      free_inner_oo_type(data.val.oo_type);
+      free_inner_oo_type(data.val.sid.binding.val.oo_type);
       break;
     case ITEM_FUN:
       sb_free(data.fun.type_args);
+      sb_free(data.fun.arg_muts);
       sb_free(data.fun.arg_sids);
       free_sb_types(data.fun.arg_types);
       free_inner_type(data.fun.ret);
       free_inner_block(data.fun.body);
-      free_inner_oo_type(data.fun.oo_type);
+      free_inner_oo_type(data.fun.sid.binding.val.oo_type);
       break;
     case ITEM_FFI_VAL:
       free_inner_type(data.ffi_val.type);
-      free_inner_oo_type(data.fun.oo_type);
+      free_inner_oo_type(data.ffi_val.sid.binding.val.oo_type);
       break;
     case ITEM_FFI_INCLUDE:
       break;

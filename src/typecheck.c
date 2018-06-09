@@ -528,7 +528,7 @@ static void asg_type_to_oo_type(OoContext *cx, OoError *err, AsgType *asg_type, 
   switch (asg_type->tag) {
     case TYPE_ID:
       oo_type->tag = OO_TYPE_BINDING;
-      oo_type->binding = asg_type->id.binding;
+      oo_type->binding = &asg_type->id.binding;
       break;
     case TYPE_MACRO:
       // noop
@@ -686,28 +686,36 @@ static void file_coarse_types(OoContext *cx, OoError *err, AsgFile *asg) {
         asg_type_to_oo_type(cx, err, &asg->items[i].type.type, &asg->items[i].type.oo_type);
         break;
       case ITEM_VAL:
-        asg_type_to_oo_type(cx, err, &asg->items[i].val.type, &asg->items[i].val.oo_type);
+        asg_type_to_oo_type(cx, err, &asg->items[i].val.type, &asg->items[i].val.sid.binding.val.oo_type);
         break;
       case ITEM_FUN:
-        asg->items[i].fun.oo_type.tag = OO_TYPE_FUN_NAMED;
-        asg->items[i].fun.oo_type.fun_named.arg_types = NULL;
-        sb_add(asg->items[i].fun.oo_type.fun_named.arg_types, sb_count(asg->items[i].fun.arg_types));
-        asg->items[i].fun.oo_type.fun_named.arg_sids = asg->items[i].fun.arg_sids;
+        asg->items[i].fun.sid.binding.val.oo_type.tag = OO_TYPE_FUN_NAMED;
+        asg->items[i].fun.sid.binding.val.oo_type.fun_named.arg_types = NULL;
+        sb_add(
+          asg->items[i].fun.sid.binding.val.oo_type.fun_named.arg_types,
+          sb_count(asg->items[i].fun.arg_types)
+        );
+        asg->items[i].fun.sid.binding.val.oo_type.fun_named.arg_sids = asg->items[i].fun.arg_sids;
 
         for (size_t j = 0; j < (size_t) sb_count(asg->items[i].fun.arg_types); j++) {
           asg_type_to_oo_type(
-            cx, err, &asg->items[i].fun.arg_types[j], &asg->items[i].fun.oo_type.fun_named.arg_types[j]
+            cx, err, &asg->items[i].fun.arg_types[j],
+            &asg->items[i].fun.sid.binding.val.oo_type.fun_named.arg_types[j]
           );
           if (err->tag != OO_ERR_NONE) {
             return;
           }
         }
 
-        asg->items[i].fun.oo_type.fun_named.ret = malloc(sizeof(OoType));
-        asg_type_to_oo_type(cx, err, &asg->items[i].fun.ret, asg->items[i].fun.oo_type.fun_named.ret);
+        asg->items[i].fun.sid.binding.val.oo_type.fun_named.ret = malloc(sizeof(OoType));
+        asg_type_to_oo_type(
+          cx, err, &asg->items[i].fun.ret, asg->items[i].fun.sid.binding.val.oo_type.fun_named.ret
+        );
         break;
       case ITEM_FFI_VAL:
-        asg_type_to_oo_type(cx, err, &asg->items[i].ffi_val.type, &asg->items[i].ffi_val.oo_type);
+        asg_type_to_oo_type(
+          cx, err, &asg->items[i].ffi_val.type, &asg->items[i].ffi_val.sid.binding.val.oo_type
+        );
         break;
       case ITEM_USE:
       case ITEM_FFI_INCLUDE:
@@ -721,6 +729,45 @@ static void file_coarse_types(OoContext *cx, OoError *err, AsgFile *asg) {
   }
 }
 
+// static void file_typecheck(OoContext *cx, OoError *err, AsgFile *asg) {
+//   err->asg = asg;
+//   size_t count = sb_count(asg->items);
+//   for (size_t i = 0; i < count; i++) {
+//     switch (asg->items[i].tag) {
+//       case ITEM_VAL:
+//         exp_typecheck(cx, err, &asg->items[i].val.exp, &asg->items[i].val.oo_type);
+//         break;
+//       case ITEM_FUN: // TODO
+//         asg->items[i].fun.oo_type.tag = OO_TYPE_FUN_NAMED;
+//         asg->items[i].fun.oo_type.fun_named.arg_types = NULL;
+//         sb_add(asg->items[i].fun.oo_type.fun_named.arg_types, sb_count(asg->items[i].fun.arg_types));
+//         asg->items[i].fun.oo_type.fun_named.arg_sids = asg->items[i].fun.arg_sids;
+//
+//         for (size_t j = 0; j < (size_t) sb_count(asg->items[i].fun.arg_types); j++) {
+//           asg_type_to_oo_type(
+//             cx, err, &asg->items[i].fun.arg_types[j], &asg->items[i].fun.oo_type.fun_named.arg_types[j]
+//           );
+//           if (err->tag != OO_ERR_NONE) {
+//             return;
+//           }
+//         }
+//
+//         asg->items[i].fun.oo_type.fun_named.ret = malloc(sizeof(OoType));
+//         asg_type_to_oo_type(cx, err, &asg->items[i].fun.ret, asg->items[i].fun.oo_type.fun_named.ret);
+//         break;
+//       case ITEM_USE:
+//       case ITEM_TYPE:
+//       case ITEM_FFI_INCLUDE:
+//       case ITEM_FFI_VAL:
+//         // noop
+//         break;
+//     }
+//
+//     if (err->tag != OO_ERR_NONE) {
+//       return;
+//     }
+//   }
+// }
 
 // Type checking overview: OoType represents a type. For each item, the type can
 // be derived from the annotation, so this is done in a first step (`file_coarse_types`).
@@ -738,4 +785,11 @@ void oo_cx_type_checking(OoContext *cx, OoError *err) {
       return;
     }
   }
+
+  // for (int i = 0; i < count; i++) {
+  //   file_typecheck(cx, err, cx->files[i]);
+  //   if (err->tag != OO_ERR_NONE) {
+  //     return;
+  //   }
+  // }
 }

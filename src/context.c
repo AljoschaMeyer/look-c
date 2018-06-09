@@ -589,7 +589,7 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
   // printf("file_coarse_bindings for %s\n", asg->path);
 
   size_t count = sb_count(asg->items);
-  sb_add(asg->ns.bindings, 16 + (int) count); // mod, dep, and the 14 primitive types
+  sb_add(asg->ns.bindings, 18 + (int) count); // mod, dep, and the 14 primitive types
   asg->ns.bindings_by_sid = raxNew();
   asg->ns.pub_bindings_by_sid = raxNew();
 
@@ -689,6 +689,18 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
   asg->ns.bindings[15].primitive = PRIM_BOOL;
   raxInsert(asg->ns.bindings_by_sid, "Bool", 4, &asg->ns.bindings[15], NULL);
 
+  asg->ns.bindings[16].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[16].private = false;
+  asg->ns.bindings[16].file = NULL;
+  asg->ns.bindings[16].primitive = PRIM_U128;
+  raxInsert(asg->ns.bindings_by_sid, "U128", 4, &asg->ns.bindings[16], NULL);
+
+  asg->ns.bindings[17].tag = BINDING_PRIMITIVE;
+  asg->ns.bindings[17].private = false;
+  asg->ns.bindings[17].file = NULL;
+  asg->ns.bindings[17].primitive = PRIM_I128;
+  raxInsert(asg->ns.bindings_by_sid, "I128", 4, &asg->ns.bindings[17], NULL);
+
   for (size_t i = 0; i < count; i++) {
     Str str;
     switch (asg->items[i].tag) {
@@ -699,10 +711,10 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
         switch (asg->items[i].tag) {
           case ITEM_TYPE:
             str = asg->items[i].type.sid.str;
-            asg->ns.bindings[i + 16].tag = BINDING_TYPE; // later overwritten for sum types
-            asg->ns.bindings[i + 16].private = true;
-            asg->ns.bindings[i + 16].file = asg;
-            asg->ns.bindings[i + 16].type = &asg->items[i].type; // later overwritten for sum types
+            asg->ns.bindings[i + 18].tag = BINDING_TYPE; // later overwritten for sum types
+            asg->ns.bindings[i + 18].private = true;
+            asg->ns.bindings[i + 18].file = asg;
+            asg->ns.bindings[i + 18].type = &asg->items[i].type; // later overwritten for sum types
 
             // handle sum type namespaces
             bool is_sum = false;
@@ -733,10 +745,15 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
               raxInsert(sum->ns.pub_bindings_by_sid, "mod", 3, (void *) &sum->ns.bindings[0], NULL);
 
               for (int j = 1; j < count; j++) {
-                sum->ns.bindings[j].tag = BINDING_SUMMAND;
+                sum->ns.bindings[j].tag = BINDING_VAL;
                 sum->ns.bindings[j].private = true;
                 sum->ns.bindings[j].file = asg;
-                sum->ns.bindings[j].summand = &sum->summands[j - 1];
+                sum->ns.bindings[j].val.mut = false;
+                sum->ns.bindings[j].val.sid = &sum->summands[j - 1].sid;
+                sum->ns.bindings[j].val.type = NULL;
+                sum->ns.bindings[j].val.oo_type.tag = OO_TYPE_UNINITIALIZED;
+                sum->ns.bindings[j].val.tag = VAL_SUMMAND;
+                sum->ns.bindings[j].val.summand = &sum->summands[j - 1];
 
                 raxInsert(
                   sum->ns.bindings_by_sid,
@@ -757,40 +774,55 @@ static void file_coarse_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
                 }
               }
 
-              asg->ns.bindings[i + 16].tag = BINDING_SUM_TYPE;
-              asg->ns.bindings[i + 16].sum.type = &asg->items[i];
-              asg->ns.bindings[i + 16].sum.ns = &sum->ns;
+              asg->ns.bindings[i + 18].tag = BINDING_SUM_TYPE;
+              asg->ns.bindings[i + 18].sum.type = &asg->items[i];
+              asg->ns.bindings[i + 18].sum.ns = &sum->ns;
             }
 
             break;
           case ITEM_VAL:
             str = asg->items[i].val.sid.str;
-            asg->ns.bindings[i + 16].tag = BINDING_VAL;
-            asg->ns.bindings[i + 16].private = true;
-            asg->ns.bindings[i + 16].file = asg;
-            asg->ns.bindings[i + 16].val = &asg->items[i].val;
+            asg->ns.bindings[i + 18].tag = BINDING_VAL;
+            asg->ns.bindings[i + 18].private = true;
+            asg->ns.bindings[i + 18].file = asg;
+            asg->ns.bindings[i + 18].val.mut = asg->items[i].val.mut;
+            asg->ns.bindings[i + 18].val.sid = &asg->items[i].val.sid;
+            asg->ns.bindings[i + 18].val.type = &asg->items[i].val.type;
+            asg->ns.bindings[i + 18].val.oo_type.tag = OO_TYPE_UNINITIALIZED;
+            asg->ns.bindings[i + 18].val.tag = VAL_VAL;
+            asg->ns.bindings[i + 18].val.val = &asg->items[i].val;
             break;
           case ITEM_FUN:
             str = asg->items[i].fun.sid.str;
-            asg->ns.bindings[i + 16].tag = BINDING_FUN;
-            asg->ns.bindings[i + 16].private = true;
-            asg->ns.bindings[i + 16].file = asg;
-            asg->ns.bindings[i + 16].fun = &asg->items[i].fun;
+            asg->ns.bindings[i + 18].tag = BINDING_VAL;
+            asg->ns.bindings[i + 18].private = true;
+            asg->ns.bindings[i + 18].file = asg;
+            asg->ns.bindings[i + 18].val.mut = false;
+            asg->ns.bindings[i + 18].val.sid = &asg->items[i].fun.sid;
+            asg->ns.bindings[i + 18].val.type = NULL;
+            asg->ns.bindings[i + 18].val.oo_type.tag = OO_TYPE_UNINITIALIZED;
+            asg->ns.bindings[i + 18].val.tag = VAL_FUN;
+            asg->ns.bindings[i + 18].val.fun = &asg->items[i].fun;
             break;
           case ITEM_FFI_VAL:
             str = asg->items[i].ffi_val.sid.str;
-            asg->ns.bindings[i + 16].tag = BINDING_FFI_VAL;
-            asg->ns.bindings[i + 16].private = true;
-            asg->ns.bindings[i + 16].file = asg;
-            asg->ns.bindings[i + 16].ffi_val = &asg->items[i].ffi_val;
+            asg->ns.bindings[i + 18].tag = BINDING_VAL;
+            asg->ns.bindings[i + 18].private = true;
+            asg->ns.bindings[i + 18].file = asg;
+            asg->ns.bindings[i + 18].val.mut = asg->items[i].ffi_val.mut;
+            asg->ns.bindings[i + 18].val.sid = &asg->items[i].ffi_val.sid;
+            asg->ns.bindings[i + 18].val.type = &asg->items[i].ffi_val.type;
+            asg->ns.bindings[i + 18].val.oo_type.tag = OO_TYPE_UNINITIALIZED;
+            asg->ns.bindings[i + 18].val.tag = VAL_FFI;
+            asg->ns.bindings[i + 18].val.ffi = &asg->items[i].ffi_val;
             break;
           default:
             abort(); // unreachable
         }
 
-        if (raxInsert(asg->ns.bindings_by_sid, str.start, str.len, &asg->ns.bindings[i + 16], NULL)) {
+        if (raxInsert(asg->ns.bindings_by_sid, str.start, str.len, &asg->ns.bindings[i + 18], NULL)) {
           if (asg->items[i].pub) {
-            raxInsert(asg->ns.pub_bindings_by_sid, str.start, str.len, &asg->ns.bindings[i + 16], NULL);
+            raxInsert(asg->ns.pub_bindings_by_sid, str.start, str.len, &asg->ns.bindings[i + 18], NULL);
           }
         } else {
           err->tag = OO_ERR_DUP_ID_ITEM;
@@ -941,10 +973,15 @@ void add_pattern_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgPatter
       }
 
       AsgBinding *b = malloc(sizeof(AsgBinding));
-      b->tag = BINDING_PATTERN_ID;
+      b->tag = BINDING_VAL;
       b->private = true;
       b->file = asg;
-      b->pattern_id = &p->id;
+      b->val.mut = p->id.mut;
+      b->val.sid = &p->id.sid;
+      b->val.type = p->id.type;
+      b->val.oo_type.tag = OO_TYPE_UNINITIALIZED;
+      b->val.tag = VAL_PATTERN;
+      b->val.pattern = &p->id;
 
       ss_add(err, asg, ss, p->id.sid.str, b);
       break;
@@ -978,7 +1015,7 @@ void add_pattern_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgPatter
       if (err->tag != OO_ERR_NONE) {
         return;
       } else {
-        if (p->summand_anon.id.binding.tag != BINDING_SUMMAND) {
+        if (p->summand_anon.id.binding.tag != BINDING_VAL && p->summand_anon.id.binding.val.tag != VAL_SUMMAND) {
           err->tag = OO_ERR_BINDING_NOT_SUMMAND;
           err->binding_not_summand = &p->summand_anon.id;
           return;
@@ -998,7 +1035,7 @@ void add_pattern_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgPatter
       if (err->tag != OO_ERR_NONE) {
         return;
       } else {
-        if (p->summand_named.id.binding.tag != BINDING_SUMMAND) {
+        if (p->summand_anon.id.binding.tag != BINDING_VAL && p->summand_anon.id.binding.val.tag != VAL_SUMMAND) {
           err->tag = OO_ERR_BINDING_NOT_SUMMAND;
           err->binding_not_summand = &p->summand_named.id;
           return;
@@ -1144,11 +1181,16 @@ static void file_fine_bindings(OoContext *cx, OoError *err, AsgFile *asg) {
 
           for (size_t j = 0; j < (size_t) sb_count(asg->items[i].fun.arg_types); j++) {
             AsgBinding *b = malloc(sizeof(AsgBinding));
-            b->tag = BINDING_ARG;
+            b->tag = BINDING_VAL;
             b->private = true;
             b->file = asg;
-            b->arg.sid = &asg->items[i].fun.arg_sids[j];
-            b->arg.type = &asg->items[i].fun.arg_types[j];
+            b->val.mut = asg->items[i].fun.arg_muts[j];
+            b->val.sid = &asg->items[i].fun.arg_sids[j];
+            b->val.type = &asg->items[i].fun.arg_types[j];
+            b->val.oo_type.tag = OO_TYPE_UNINITIALIZED;
+            b->val.tag = VAL_ARG;
+            b->val.arg = &asg->items[i].fun.arg_sids[j];
+
             ss_add(err, asg, &ss, asg->items[i].fun.arg_sids[j].str, b);
             if (err->tag != OO_ERR_NONE) {
               ss_free(&ss);
@@ -1387,14 +1429,7 @@ static void exp_fine_bindings(OoContext *cx, OoError *err, ScopeStack *ss, AsgEx
   switch (exp->tag) {
     case EXP_ID:
       id_fine_bindings(cx, err, ss, &exp->id, asg);
-      if (
-        err->tag == OO_ERR_NONE &&
-        exp->id.binding.tag != BINDING_VAL &&
-        exp->id.binding.tag != BINDING_FUN &&
-        exp->id.binding.tag != BINDING_FFI_VAL &&
-        exp->id.binding.tag != BINDING_SUMMAND &&
-        exp->id.binding.tag != BINDING_ARG
-      ) {
+      if (err->tag == OO_ERR_NONE && exp->id.binding.tag != BINDING_VAL) {
         err->tag = OO_ERR_BINDING_NOT_EXP;
         err->binding_not_exp = &exp->id;
         return;

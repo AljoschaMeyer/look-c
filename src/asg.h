@@ -35,97 +35,11 @@ typedef struct AsgItemVal AsgItemVal;
 typedef struct AsgItemFun AsgItemFun;
 typedef struct AsgItemFfiVal AsgItemFfiVal;
 
+typedef struct AsgBinding AsgBinding;
 typedef struct OoType OoType;
 
 typedef enum {
-  PRIM_U8,
-  PRIM_U16,
-  PRIM_U32,
-  PRIM_U64,
-  PRIM_USIZE,
-  PRIM_I8,
-  PRIM_I16,
-  PRIM_I32,
-  PRIM_I64,
-  PRIM_ISIZE,
-  PRIM_F32,
-  PRIM_F64,
-  PRIM_VOID,
-  PRIM_BOOL
-} AsgPrimitive;
-
-typedef enum {
-  BINDING_NONE,
-  BINDING_TYPE,
-  BINDING_VAL,
-  BINDING_FUN,
-  BINDING_FFI_VAL,
-  BINDING_NS,
-  BINDING_SUM_TYPE,
-  BINDING_SUMMAND,
-  BINDING_TYPE_VAR,
-  BINDING_PRIMITIVE,
-  BINDING_ARG,
-  BINDING_PATTERN_ID
-} TagBinding;
-
-typedef struct AsgBindingSum {
-  AsgItem *type;
-  AsgNS *ns;
-} AsgBindingSum;
-
-typedef struct AsgBindingArg {
-  AsgSid *sid;
-  AsgType *type;
-} AsgBindingArg;
-
-// References to other parts of the ASG.
-typedef struct AsgBinding {
-  TagBinding tag;
-  bool private; // If false, the non-public information of the binding should not be accessed.
-  AsgFile *file; // File in which the binding is defined. NULL for directories, mod, dep, primitives, etc.
-  union {
-    AsgItemType *type;
-    AsgItemVal *val;
-    AsgItemFun *fun;
-    AsgItemFfiVal *ffi_val;
-    AsgNS *ns;
-    AsgBindingSum sum;
-    AsgSummand *summand;
-    AsgSid *type_var;
-    AsgPrimitive primitive;
-    AsgBindingArg arg;
-    AsgPatternId *pattern_id;
-  };
-} AsgBinding;
-
-bool is_type_binding(AsgBinding b);
-
-typedef enum {
-  NS_FILE,
-  NS_DIR,
-  NS_MODS,
-  NS_DEPS,
-  NS_SUM
-} TagNS;
-
-// A namespace. These are owned by AsgFiles, sum AsgTypeSums, and by the OoContext (for
-// the mod and dep namespace, and for all directories).
-typedef struct AsgNS {
-  rax *bindings_by_sid;
-  rax *pub_bindings_by_sid;
-  AsgBinding *bindings; // owning stretchy buffer
-  TagNS tag;
-  union {
-    AsgFile *file;
-    AsgTypeSum *sum;
-  };
-} AsgNS;
-
-void free_ns(AsgNS ns);
-
-typedef enum {
-  OO_TYPE_UNINITIALIZED, // defaul value before type checking
+  OO_TYPE_UNINITIALIZED, // default value before type checking
   OO_TYPE_BINDING,
   OO_TYPE_PTR,
   OO_TYPE_PTR_MUT,
@@ -174,7 +88,7 @@ typedef struct OoTypeApp {
 typedef struct OoType {
   OoTypeTag tag;
   union {
-    AsgBinding binding;
+    AsgBinding *binding;
     OoType *ptr;
     OoType *ptr_mut;
     OoType *array;
@@ -188,7 +102,106 @@ typedef struct OoType {
     OoTypeApp app;
     uint32_t arg; // A type argument of an OoTypeGeneric, identified by its index
   };
-} OoType; // TODO mutability?
+} OoType;
+
+typedef enum {
+  PRIM_U8,
+  PRIM_U16,
+  PRIM_U32,
+  PRIM_U64,
+  PRIM_U128,
+  PRIM_USIZE,
+  PRIM_I8,
+  PRIM_I16,
+  PRIM_I32,
+  PRIM_I64,
+  PRIM_I128,
+  PRIM_ISIZE,
+  PRIM_F32,
+  PRIM_F64,
+  PRIM_VOID,
+  PRIM_BOOL
+} AsgPrimitive;
+
+typedef enum {
+  BINDING_NONE,
+  BINDING_TYPE,
+  BINDING_VAL,
+  BINDING_NS,
+  BINDING_SUM_TYPE,
+  BINDING_TYPE_VAR,
+  BINDING_PRIMITIVE,
+} TagBinding;
+
+typedef struct AsgBindingSum {
+  AsgItem *type;
+  AsgNS *ns;
+} AsgBindingSum;
+
+typedef enum {
+  VAL_VAL,
+  VAL_FUN,
+  VAL_FFI,
+  VAL_ARG,
+  VAL_PATTERN,
+  VAL_SUMMAND
+} TagVal;
+
+typedef struct AsgBindingVal {
+  bool mut;
+  AsgSid *sid;
+  AsgType *type; // NULL if no type annoation or fun or summand (TODO does this actually get used?)
+  OoType oo_type; // tag OO_TYPE_UNINITIALIZED if no type annotation
+  TagVal tag;
+  union {
+    AsgItemVal *val;
+    AsgItemFun *fun;
+    AsgItemFfiVal *ffi;
+    AsgSid *arg;
+    AsgPatternId *pattern;
+    AsgSummand *summand;
+  };
+} AsgBindingVal;
+
+// References to other parts of the ASG.
+typedef struct AsgBinding {
+  TagBinding tag;
+  bool private; // If false, the non-public information of the binding should not be accessed.
+  AsgFile *file; // File in which the binding is defined. NULL for directories, mod, dep, primitives, etc.
+  union {
+    AsgItemType *type;
+    AsgBindingVal val;
+    AsgNS *ns;
+    AsgBindingSum sum;
+    AsgSid *type_var;
+    AsgPrimitive primitive;
+  };
+} AsgBinding;
+
+bool is_type_binding(AsgBinding b);
+
+typedef enum {
+  NS_FILE,
+  NS_DIR,
+  NS_MODS,
+  NS_DEPS,
+  NS_SUM
+} TagNS;
+
+// A namespace. These are owned by AsgFiles, sum AsgTypeSums, and by the OoContext (for
+// the mod and dep namespace, and for all directories).
+typedef struct AsgNS {
+  rax *bindings_by_sid;
+  rax *pub_bindings_by_sid;
+  AsgBinding *bindings; // owning stretchy buffer
+  TagNS tag;
+  union {
+    AsgFile *file;
+    AsgTypeSum *sum;
+  };
+} AsgNS;
+
+void free_ns(AsgNS ns);
 
 // A simple identifier
 typedef struct AsgSid {
@@ -666,17 +679,16 @@ typedef struct AsgItemVal {
   AsgSid sid;
   AsgType type;
   AsgExp exp;
-  OoType oo_type;
 } AsgItemVal;
 
 typedef struct AsgItemFun {
   AsgSid sid;
   AsgSid *type_args; // stretchy buffer
   AsgSid *arg_sids; //stretchy buffer
+  bool *arg_muts; // stretchy buffer, same length as arg_sids
   AsgType *arg_types; // stretchy buffer, same length as arg_sids
   AsgType ret; // empty anon product if return type is omitted in the syntax
   AsgBlock body;
-  OoType oo_type;
 } AsgItemFun;
 
 typedef struct AsgItemFfiInclude {
@@ -687,7 +699,6 @@ typedef struct AsgItemFfiVal {
   bool mut;
   AsgSid sid;
   AsgType type;
-  OoType oo_type;
 } AsgItemFfiVal;
 
 typedef struct AsgItem {
